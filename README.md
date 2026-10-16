@@ -21,14 +21,26 @@ SubastaYa es una plataforma de subastas en línea que está construida con estos
 - **Juego limpio:** A partir de un mecanismo de extensión automática de tiempo conocido como
   (*anti-sniping*) evita que haya victorias a partir de ofertas de último momento.
 
-## Origen del proyecto
+## Funcionalidades
 
-SubastaYa nació como trabajo práctico en equipo ([Pabl0ScB/SubastaYa](https://github.com/Pabl0ScB/SubastaYa)).
-Esta versión reorganiza el código en capas (Domain, Application, Infrastructure y Api) con
-repositorios y unidad de trabajo, aplicando SOLID, sin cambiar la base de datos, la API ni el frontend.
-
-- [CAMBIOS-REFACTOR.md](CAMBIOS-REFACTOR.md): qué se reorganizó respecto de la versión original y por qué.
-- [PRUEBAS-MANUALES.md](PRUEBAS-MANUALES.md): checklist de pruebas manuales de punta a punta.
+- **Registro e inicio de sesión** con contraseñas hasheadas (BCrypt) y autenticación por token JWT.
+- **Catálogo de subastas** con filtros, paginación y detalle de cada subasta.
+- **Publicación de subastas** con título, descripción, imagen, categoría, precio base,
+  incremento mínimo y fechas de inicio y fin.
+- **Pujas en tiempo real** por SignalR: todos los que están en la sala ven la oferta nueva,
+  y la sala se actualiza sola cuando la subasta se activa o finaliza.
+- **Billetera virtual** con depósitos, saldo disponible y retenido, e historial de movimientos.
+- **Saldo en garantía (escrow):** al pujar se retiene el monto; si otro supera la oferta, se
+  libera el saldo del anterior líder en la misma transacción.
+- **Anti-sniping:** si una oferta llega en el último minuto, el cierre se extiende 2 minutos.
+- **Cierre automático:** un proceso en segundo plano activa las subastas programadas, cierra
+  las vencidas, le paga al vendedor con lo que el ganador tenía retenido y marca desiertas
+  las que no tuvieron ofertas.
+- **Auditoría** de las acciones relevantes: ofertas rechazadas, extensiones de tiempo,
+  activaciones y cierres.
+- **Control de concurrencia optimista:** dos ofertas simultáneas no pueden quedar ambas
+  como ganadoras; la segunda recibe un 409 con el nuevo mínimo.
+- **Mis actividades:** las pujas realizadas y las subastas publicadas por cada usuario.
 
 ## Stack tecnológico
 
@@ -105,6 +117,44 @@ son columnas de `Subasta` en lugar de vivir en una tabla aparte, porque en este 
 no hay stock ni un catálogo de productos por fuera de las subastas: un producto nace con
 su subasta y no se vuelve a subastar por separado. Separarlo hubiera agregado una tabla
 y una relación sin resolver ningún requisito real.
+
+## API
+
+Base: `/api/v1`. Los endpoints de publicar, pujar, billetera y `/users/me` requieren el
+token JWT en el encabezado `Authorization: Bearer <token>`.
+
+| Método | Ruta | Descripción |
+|---|---|---|
+| POST | `/auth/sessions` | Iniciar sesión |
+| POST | `/users` | Registrar un usuario |
+| GET | `/users/me` | Datos del usuario autenticado |
+| GET | `/users/me/bids` | Pujas del usuario |
+| GET | `/users/me/auctions` | Subastas publicadas por el usuario |
+| GET | `/categories` | Categorías |
+| GET | `/auctions` | Catálogo con filtros y paginación |
+| GET | `/auctions/{id}` | Detalle de una subasta |
+| POST | `/auctions` | Publicar una subasta |
+| GET / POST | `/auctions/{id}/bids` | Listar pujas / ofertar |
+| GET | `/wallets/me` | Saldo total, retenido y disponible |
+| POST | `/wallets/me/deposits` | Depositar saldo |
+| GET | `/wallets/me/entries` | Historial de movimientos |
+
+El hub de SignalR está en `/hubs/subastas`. La documentación completa con los códigos de
+respuesta (201, 401, 403, 404, 409, 422) está en Swagger.
+
+## Estructura del repositorio
+
+```
+SubastaYa/
+├── src/
+│   ├── SubastaYa.Domain/          Entidades, reglas y contratos
+│   ├── SubastaYa.Application/     Casos de uso, DTOs y consultas
+│   ├── SubastaYa.Infrastructure/  EF Core, repositorios, migraciones y seed
+│   └── SubastaYa.Api/             Controllers, SignalR, worker y arranque
+├── frontend/                      HTML, CSS y JavaScript
+├── scripts/                       Prueba de concurrencia
+└── docker-compose.yml             PostgreSQL y pgAdmin
+```
 
 ## Usuarios de prueba
 
