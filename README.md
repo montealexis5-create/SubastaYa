@@ -21,6 +21,15 @@ SubastaYa es una plataforma de subastas en línea que está construida con estos
 - **Juego limpio:** A partir de un mecanismo de extensión automática de tiempo conocido como
   (*anti-sniping*) evita que haya victorias a partir de ofertas de último momento.
 
+## Origen del proyecto
+
+SubastaYa nació como trabajo práctico en equipo ([Pabl0ScB/SubastaYa](https://github.com/Pabl0ScB/SubastaYa)).
+Esta versión reorganiza el código en capas (Domain, Application, Infrastructure y Api) con
+repositorios y unidad de trabajo, aplicando SOLID, sin cambiar la base de datos, la API ni el frontend.
+
+- [CAMBIOS-REFACTOR.md](CAMBIOS-REFACTOR.md): qué se reorganizó respecto de la versión original y por qué.
+- [PRUEBAS-MANUALES.md](PRUEBAS-MANUALES.md): checklist de pruebas manuales de punta a punta.
+
 ## Stack tecnológico
 
 | Capa | Tecnología | Versión |
@@ -135,7 +144,7 @@ proyecto apunta a `net10.0` y no compila con versiones anteriores.
 ### 1. Clonar el repositorio
 
 ```bash
-git clone https://github.com/Pabl0ScB/SubastaYa.git
+git clone https://github.com/montealexis5-create/SubastaYa.git
 cd SubastaYa
 ```
 
