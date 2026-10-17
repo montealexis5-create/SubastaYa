@@ -29,5 +29,8 @@ La Api y Application no usan `DbContext`. Domain y Application no tienen EF.
 ## Verificado
 Compilo y corrio en la maquina de Alexis: migracion, seed, worker (cierre de subasta con ganador) y catalogo. 112 chequeos automaticos, prueba de inyeccion de dependencias y ESLint sin errores.
 
+## Verificado en ejecucion (16/10)
+Prueba de concurrencia (`scripts/prueba-concurrencia.ps1`): una oferta aceptada y el resto rechazadas por ronda. Auditoria con `PUJA_RECHAZADA_CONCURRENCIA`, `PUJA_RECHAZADA_VALIDACION` y `ACTIVACION_WORKER`. Saldo total conciliado con el ledger y saldo retenido igual a las pujas lideres, en todas las billeteras.
+
 ## Pendiente
-Las pruebas manuales de `PRUEBAS-MANUALES.md` no se hicieron todavia.
+Las pruebas manuales de `PRUEBAS-MANUALES.md` desde el navegador (pujas, superada, saldo insuficiente, anti-sniping, cierre y avisos de `puja.js`) las hace Pablo.
