@@ -19,7 +19,7 @@ La Api y Application no usan `DbContext`. Domain y Application no tienen EF.
 ## SOLID
 - **S**: los servicios grandes se partieron en piezas de una sola tarea: `ValidadorDePujas`, `RegistradorDePujas`, `CierreDeSubastas`, `ActivadorDeSubastas`, `ServicioDeAdjudicacion`.
 - **D**: Application depende de interfaces; Infrastructure las implementa; todo entra por inyeccion.
-- **I**: interfaces chicas, sin metodos que nadie use.
+- **I**: interfaces chicas; cada servicio depende solo de lo que usa. `SumarPorBilleteraAsync` se conserva sin llamadas como herramienta para conciliar el saldo con el ledger.
 
 ## Otros cambios
 - Un repositorio por entidad y una unidad de trabajo que maneja la transaccion. Ahi se convierten los errores de concurrencia de EF en excepciones del dominio (termina en el 409).
