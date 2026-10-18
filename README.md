@@ -108,8 +108,8 @@ insertarían cada una su fila sin chocar entre sí, y las dos "ganarían" — qu
 exactamente lo que el control de concurrencia tiene que impedir.
 
 **Los asientos del ledger y los registros de auditoría no se modifican nunca.** Sus
-repositorios solo exponen insertar y consultar. Si en algún momento hay que corregir un
-error contable, la corrección no reescribe el asiento original: agrega uno nuevo que lo
+repositorios solo permiten agregar filas (el del ledger también suma los montos de una
+billetera). Si en algún momento hay que corregir un error contable, la corrección no reescribe el asiento original: agrega uno nuevo que lo
 compensa, y así queda el rastro de que la corrección existió.
 
 **No existe una entidad `Producto`.** El título, la descripción, la imagen y la categoría
@@ -194,7 +194,7 @@ proyecto apunta a `net10.0` y no compila con versiones anteriores.
 ### 1. Clonar el repositorio
 
 ```bash
-git clone https://github.com/montealexis5-create/SubastaYa.git
+git clone https://github.com/Pabl0ScB/SubastaYa.git
 cd SubastaYa
 ```
 

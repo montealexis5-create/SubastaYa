@@ -181,6 +181,7 @@ async function cargarCategorias() {
     try {
         await poblarCategorias(document.getElementById('filtro-categoria'));
     } catch {
+        // Si falla, queda solo la opcion "Todas" y el catalogo se puede usar igual.
         return;
     }
 }

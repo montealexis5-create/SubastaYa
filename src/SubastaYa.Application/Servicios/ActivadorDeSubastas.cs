@@ -32,7 +32,7 @@ public class ActivadorDeSubastas : IActivadorDeSubastas
 		_logger = logger;
 	}
 
-	/// Programada a Activa. Se audita igual que el cierre, el enunciado pide todos los cambios de estado.
+	/// Programada a Activa. Se audita igual que el cierre.
 	public async Task ActivarAsync(int subastaId, DateTime ahora, CancellationToken cancelacion)
 	{
 		var subasta = await _subastas.ObtenerProgramadaParaActivarAsync(subastaId, ahora, cancelacion);

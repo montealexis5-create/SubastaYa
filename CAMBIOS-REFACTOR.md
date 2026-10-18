@@ -23,13 +23,12 @@ La Api y Application no usan `DbContext`. Domain y Application no tienen EF.
 
 ## Otros cambios
 - Un repositorio por entidad y una unidad de trabajo que maneja la transaccion. Ahi se convierten los errores de concurrencia de EF en excepciones del dominio (termina en el 409).
-- Huecos del enunciado: auditoria de todas las acciones (activacion y cierre por worker, cierre desierta, rechazos de puja, acreditacion manual), anti-sniping configurable y reintento del worker ante conflicto.
-- Limpieza de codigo muerto y estilo segun la guia de buenas practicas.
+- Auditoria segun la seccion 3.4 del enunciado: cambios de estado (activacion y cierre por el worker, cierre desierta), extensiones anti-sniping, rechazos de puja y acreditacion manual. Ademas, anti-sniping configurable y reintento del worker ante conflicto.
+- Limpieza de codigo muerto y estilo segun la guia "Buenas practicas Java y C#" de la catedra (por ejemplo, indentacion con tabs de 4 espacios).
 
 ## Verificado
-Compilo y corrio en la maquina de Alexis: migracion, seed, worker (cierre de subasta con ganador) y catalogo. 112 chequeos automaticos, prueba de inyeccion de dependencias y ESLint sin errores.
+Compila y corre en la maquina de Alexis: migracion, seed, worker (cierre de subasta con ganador) y catalogo.
 
-## Verificado en ejecucion (16/10)
 Prueba de concurrencia (`scripts/prueba-concurrencia.ps1`): una oferta aceptada y el resto rechazadas por ronda. Auditoria con `PUJA_RECHAZADA_CONCURRENCIA`, `PUJA_RECHAZADA_VALIDACION` y `ACTIVACION_WORKER`. Saldo total conciliado con el ledger y saldo retenido igual a las pujas lideres, en todas las billeteras.
 
 ## Pendiente

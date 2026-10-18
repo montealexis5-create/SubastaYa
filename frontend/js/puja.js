@@ -1,8 +1,6 @@
 (() => {
     'use strict';
 
-    const SALDO_INSUFICIENTE = /^saldo insuficiente/i;
-
     let detalle = null;
     let montoMinimo = 0;
     let situacionDibujada = null;
@@ -254,10 +252,6 @@
             const mensajes = Object.values(error.erroresPorCampo)[0];
             mostrarError(Array.isArray(mensajes) ? mensajes[0] : String(mensajes));
             return;
-        }
-
-        if (error.status === 422 && SALDO_INSUFICIENTE.test(error.message)) {
-            mostrarAvisoFlotante(error.message, { tipo: 'danger', icono: '💸' });
         }
 
         mostrarError(error.message);
