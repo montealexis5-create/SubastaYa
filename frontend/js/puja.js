@@ -13,7 +13,7 @@
         estadoAnterior = evento.detail.estado;
 
         detalle = evento.detail;
-        montoMinimo = detalle.pujaActual + detalle.incrementoMinimo;
+        montoMinimo = detalle.montoMinimo;
         dibujar();
 
         if (arranco) avisarInicio(situacionDibujada);

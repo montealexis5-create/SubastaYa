@@ -16,4 +16,6 @@ public class SubastaDetalleResponse
 	public string Estado { get; set; } = null!;
 	public string SeudonimoVendedor { get; set; } = null!;
 	public string? SeudonimoLider { get; set; }
+
+	public decimal MontoMinimo => PujaActual + IncrementoMinimo;
 }

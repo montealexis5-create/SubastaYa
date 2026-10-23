@@ -56,8 +56,7 @@ function dibujarDetalle(detalle) {
     document.getElementById('precio-base').textContent = formatearPesos(detalle.precioBase);
     document.getElementById('incremento').textContent = formatearPesos(detalle.incrementoMinimo);
 
-    const ofertaMinima = detalle.pujaActual + detalle.incrementoMinimo;
-    document.getElementById('oferta-minima').textContent = formatearPesos(ofertaMinima);
+    document.getElementById('oferta-minima').textContent = formatearPesos(detalle.montoMinimo);
 
     document.getElementById('ofertas').textContent = textoDeOfertas(detalle.cantidadOfertas);
 
