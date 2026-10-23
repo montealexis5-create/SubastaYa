@@ -27,7 +27,7 @@
     });
 
     function puedeRecibirOfertas() {
-        return detalle.estado === 'Activa' && !estaVencida(detalle);
+        return detalle.estado === 'Activa';
     }
 
     function situacionActual() {

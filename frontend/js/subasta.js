@@ -19,8 +19,7 @@ const SECCIONES = {
 const CLASES_ESTADO = {
     Activa: 'text-bg-success',
     Programada: 'text-bg-secondary',
-    Finalizada: 'text-bg-primary',
-    Vencida: 'text-bg-warning'
+    Finalizada: 'text-bg-primary'
 };
 
 function mostrarEstado(estado) {
@@ -45,6 +44,8 @@ async function cargarDetalle(id) {
 }
 
 function dibujarDetalle(detalle) {
+    sincronizarReloj(detalle.fechaServidor);
+
     document.title = `${detalle.titulo} — SubastaYa`;
 
     document.getElementById('categoria').textContent = detalle.nombreCategoria;
@@ -72,31 +73,26 @@ function dibujarEstadoYTiempo(detalle) {
     const badgeEstado = document.getElementById('estado');
     const tiempo = document.getElementById('tiempo');
 
-    const estadoVisual = estaVencida(detalle) ? 'Vencida' : detalle.estado;
-
     const etiquetas = {
         Programada: 'Próxima',
         Activa: 'Activa',
         Finalizada: 'Finalizada',
-        Desierta: 'Desierta',
-        Vencida: 'Finalizando…'
+        Desierta: 'Desierta'
     };
-    badgeEstado.textContent = etiquetas[estadoVisual] ?? estadoVisual;
-    badgeEstado.className = `badge ${CLASES_ESTADO[estadoVisual] ?? 'text-bg-dark'}`;
+    badgeEstado.textContent = etiquetas[detalle.estado] ?? detalle.estado;
+    badgeEstado.className = `badge ${CLASES_ESTADO[detalle.estado] ?? 'text-bg-dark'}`;
 
-    if (estadoVisual === 'Programada') {
+    if (detalle.estado === 'Programada') {
         tiempo.textContent = `Comienza el ${formatearFecha(detalle.fechaInicio)}`;
-    } else if (estadoVisual === 'Activa') {
+    } else if (detalle.estado === 'Activa') {
         tiempo.innerHTML = '';
         const span = document.createElement('span');
         span.className = 'contador';
         span.dataset.fechaFin = detalle.fechaFin;
         tiempo.appendChild(span);
-    } else if (estadoVisual === 'Vencida') {
-        tiempo.textContent = 'Esperando cierre del sistema';
-    } else if (estadoVisual === 'Finalizada') {
+    } else if (detalle.estado === 'Finalizada') {
         tiempo.textContent = `Ganó ${detalle.seudonimoLider}`;
-    } else if (estadoVisual === 'Desierta') {
+    } else if (detalle.estado === 'Desierta') {
         tiempo.textContent = 'Terminó sin ofertas';
     }
 }

@@ -1,6 +1,7 @@
 document.addEventListener('DOMContentLoaded', () => {
     cargarCategorias();
     configurarVistaPrevia();
+    configurarLimitesDeFecha();
     limitarADosDecimales(document.getElementById('precio-base'));
     limitarADosDecimales(document.getElementById('incremento'));
     configurarEnvio();
@@ -12,6 +13,26 @@ async function cargarCategorias() {
     } catch {
         mostrarAlerta('alerta-publicar', 'No se pudieron cargar las categorías. Recargá la página.', 'danger');
     }
+}
+
+// Los limites (365 dias, tolerancia de inicio) los define el back y los expone en
+// /config/auctions. Aca solo guian al selector de fechas; el back valida igual al enviar.
+async function configurarLimitesDeFecha() {
+    try {
+        const cfg = await api.get('/config/auctions');
+        const toleranciaMs = cfg.toleranciaInicioMinutos * 60 * 1000;
+        const duracionMs = cfg.duracionMaximaDias * 24 * 60 * 60 * 1000;
+        document.getElementById('fecha-inicio').min = paraInputFecha(new Date(Date.now() - toleranciaMs));
+        document.getElementById('fecha-fin').max = paraInputFecha(new Date(Date.now() + duracionMs));
+    } catch {
+        // Si no llega la config, el back valida igual al enviar.
+    }
+}
+
+function paraInputFecha(fecha) {
+    const dos = n => String(n).padStart(2, '0');
+    return `${fecha.getFullYear()}-${dos(fecha.getMonth() + 1)}-${dos(fecha.getDate())}` +
+        `T${dos(fecha.getHours())}:${dos(fecha.getMinutes())}`;
 }
 
 function configurarVistaPrevia() {

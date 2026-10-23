@@ -39,6 +39,7 @@ async function cargarCatalogo() {
             return;
         }
 
+        sincronizarReloj(datos.items[0]?.fechaServidor);
         dibujarGrilla(datos.items);
         mostrarEstado('exito');
         dibujarPaginacion(datos);
@@ -94,11 +95,6 @@ function crearTarjeta(subasta) {
 function dibujarTiempoTarjeta(elemento, subasta) {
     if (subasta.estado === 'Programada') {
         elemento.textContent = `Próxima · ${formatearFecha(subasta.fechaInicio)}`;
-        return;
-    }
-
-    if (estaVencida(subasta)) {
-        elemento.textContent = 'Finalizando…';
         return;
     }
 

@@ -2,6 +2,7 @@ let subastaId = null;
 let conexion = null;
 let cerradaPorFin = false;
 let cantidadOfertas = 0;
+let liderActual = null;
 let montoMostrado = 0;
 const idsEnHistorial = new Set();
 
@@ -11,6 +12,7 @@ document.addEventListener('subasta:cargada', async evento => {
     subastaId = detalle.id;
     cantidadOfertas = detalle.cantidadOfertas;
     montoMostrado = detalle.pujaActual;
+    liderActual = detalle.seudonimoLider;
 
     await cargarHistorial();
 
@@ -109,8 +111,9 @@ function registrarPujaEnSala(puja) {
     }
 
     idsEnHistorial.add(puja.id);
-    cantidadOfertas++;
+    cantidadOfertas = puja.cantidadOfertas;
     montoMostrado = puja.monto;
+    liderActual = puja.seudonimo;
 
     const lista = document.getElementById('historial-pujas');
     lista.querySelector('.js-sin-ofertas')?.remove();
@@ -146,7 +149,7 @@ function actualizarEstadoPostor() {
 
     if (!participa) { badge.hidden = true; return; }
 
-    const lidera = document.getElementById('lider').textContent === usuario.seudonimo;
+    const lidera = liderActual === usuario.seudonimo;
     badge.textContent = lidera ? 'Liderando' : 'Superado';
     badge.className = `badge ms-1 ${lidera ? 'text-bg-success' : 'text-bg-warning'}`;
     badge.hidden = false;
