@@ -97,10 +97,33 @@ try {
     Resultado 'GET /auctions/999999 devuelve 404' ((Llamar GET '/auctions/999999').Codigo -eq 404)
     Resultado 'GET /wallets/me sin token devuelve 401' ((Llamar GET '/wallets/me').Codigo -eq 401)
 
-    $activas = @($lista.Datos.items | Where-Object { [datetime]$_.fechaFin -gt (Get-Date).AddMinutes(3) })
-    Resultado 'Hay una subasta activa con mas de 3 minutos por delante' ($activas.Count -gt 0) 'Volve a sembrar la base.'
-    if ($activas.Count -eq 0) { exit 1 }
-    $subastaId = ($activas | Sort-Object { [datetime]$_.fechaFin } -Descending)[0].id
+    Write-Host 'Subasta de prueba (autogenerada, no depende del seed)' -ForegroundColor Cyan
+    $sufijoV = [guid]::NewGuid().ToString('N').Substring(0, 6)
+    $passV = 'Verif' + (Get-Random -Minimum 1000 -Maximum 9999)
+    $emailVend = "vendedor-$sufijoV@prueba.com"
+    $altaVend = Llamar POST '/users' @{ email = $emailVend; password = $passV; nombre = "Vendedor $sufijoV"; seudonimo = "vend-$sufijoV" }
+    Resultado 'POST /users crea el vendedor (2xx)' ($altaVend.Codigo -ge 200 -and $altaVend.Codigo -lt 300) "codigo $($altaVend.Codigo)"
+    $tokenVend = (Llamar POST '/auth/sessions' @{ email = $emailVend; password = $passV }).Datos.token
+
+    $categorias = (Llamar GET '/categories').Datos
+    $categoriaId = if ($categorias) { $categorias[0].id } else { 1 }
+
+    $inicio = (Get-Date).AddMinutes(-1).ToString('o')
+    $fin = (Get-Date).AddMinutes(30).ToString('o')
+    $pub = Llamar POST '/auctions' @{
+        titulo = "Subasta de verificacion $sufijoV"
+        descripcion = 'Creada por el script para no depender del seed.'
+        urlImagen = 'https://example.com/x.jpg'
+        categoriaId = $categoriaId
+        precioBase = 1000
+        incrementoMinimo = 100
+        fechaInicio = $inicio
+        fechaFin = $fin
+    } $tokenVend
+    Resultado 'POST /auctions crea la subasta (201)' ($pub.Codigo -eq 201) "codigo $($pub.Codigo)"
+    if ($pub.Codigo -ne 201) { exit 1 }
+    $subastaId = $pub.Datos.id
+    Resultado 'La subasta nace Activa' ($pub.Datos.estado -eq 'Activa') "estado $($pub.Datos.estado)"
 
     Write-Host "Subasta $subastaId" -ForegroundColor Cyan
     $detalle = Llamar GET "/auctions/$subastaId"
