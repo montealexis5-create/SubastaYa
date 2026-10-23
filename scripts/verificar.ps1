@@ -125,6 +125,23 @@ try {
     $subastaId = $pub.Datos.id
     Resultado 'La subasta nace Activa' ($pub.Datos.estado -eq 'Activa') "estado $($pub.Datos.estado)"
 
+    Write-Host 'Reglas de negocio rechazadas por el back (422)' -ForegroundColor Cyan
+    function PublicarMal([string] $desc, [hashtable] $cambios) {
+        $cuerpo = @{
+            titulo = "Mala $sufijoV"; descripcion = 'prueba'; urlImagen = 'https://example.com/x.jpg'
+            categoriaId = $categoriaId; precioBase = 1000; incrementoMinimo = 100
+            fechaInicio = (Get-Date).AddMinutes(-1).ToString('o')
+            fechaFin = (Get-Date).AddMinutes(30).ToString('o')
+        }
+        foreach ($k in $cambios.Keys) { $cuerpo[$k] = $cambios[$k] }
+        $r = Llamar POST '/auctions' $cuerpo $tokenVend
+        Resultado $desc ($r.Codigo -eq 422) "codigo $($r.Codigo)"
+    }
+    PublicarMal 'Incremento mayor al precio base -> 422' @{ incrementoMinimo = 2000 }
+    PublicarMal 'Fecha inicio en el pasado -> 422' @{ fechaInicio = (Get-Date).AddMinutes(-30).ToString('o') }
+    PublicarMal 'Fecha fin anterior a la de inicio -> 422' @{ fechaInicio = (Get-Date).AddMinutes(30).ToString('o'); fechaFin = (Get-Date).AddMinutes(10).ToString('o') }
+    PublicarMal 'Fecha fin mas alla de 365 dias -> 422' @{ fechaFin = (Get-Date).AddDays(400).ToString('o') }
+
     Write-Host "Subasta $subastaId" -ForegroundColor Cyan
     $detalle = Llamar GET "/auctions/$subastaId"
     $minimo = [decimal]$detalle.Datos.montoMinimo
