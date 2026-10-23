@@ -142,11 +142,17 @@ try {
     PublicarMal 'Fecha fin anterior a la de inicio -> 422' @{ fechaInicio = (Get-Date).AddMinutes(30).ToString('o'); fechaFin = (Get-Date).AddMinutes(10).ToString('o') }
     PublicarMal 'Fecha fin mas alla de 365 dias -> 422' @{ fechaFin = (Get-Date).AddDays(400).ToString('o') }
 
+    Write-Host 'Configuracion de publicacion (API)' -ForegroundColor Cyan
+    $cfg = Llamar GET '/config/auctions'
+    Resultado 'GET /config/auctions devuelve 200' ($cfg.Codigo -eq 200)
+    Resultado 'Trae duracionMaximaDias y toleranciaInicioMinutos' ($cfg.Datos.duracionMaximaDias -gt 0 -and $cfg.Datos.toleranciaInicioMinutos -ge 0)
+
     Write-Host "Subasta $subastaId" -ForegroundColor Cyan
     $detalle = Llamar GET "/auctions/$subastaId"
     $minimo = [decimal]$detalle.Datos.montoMinimo
     $esperado = [decimal]$detalle.Datos.pujaActual + [decimal]$detalle.Datos.incrementoMinimo
     Resultado 'montoMinimo viene del back y es pujaActual + incrementoMinimo' ($minimo -eq $esperado) "recibido $minimo, esperado $esperado"
+    Resultado 'El detalle trae fechaServidor (hora del server)' ($null -ne $detalle.Datos.fechaServidor)
 
     Write-Host 'Usuario de prueba' -ForegroundColor Cyan
     $sufijo = [guid]::NewGuid().ToString('N').Substring(0, 6)
@@ -167,6 +173,7 @@ try {
     Resultado 'Oferta por debajo del minimo devuelve 422' ($debajo.Codigo -eq 422) "codigo $($debajo.Codigo)"
     $oferta = Llamar POST "/auctions/$subastaId/bids" @{ monto = $minimo } $token
     Resultado 'Oferta igual al montoMinimo devuelve 201' ($oferta.Codigo -eq 201) "codigo $($oferta.Codigo)"
+    Resultado 'La puja registrada trae cantidadOfertas del back' ($oferta.Datos.cantidadOfertas -ge 1) "valor $($oferta.Datos.cantidadOfertas)"
 
     $despues = Llamar GET "/auctions/$subastaId"
     Resultado 'La puja actual quedo en el monto ofertado' ([decimal]$despues.Datos.pujaActual -eq $minimo)
@@ -190,6 +197,14 @@ try {
     $subastaJs = Get-Content -Raw 'frontend/js/subasta.js'
     Resultado 'puja.js usa detalle.montoMinimo' ($pujaJs -match 'detalle\.montoMinimo')
     Resultado 'Ni puja.js ni subasta.js suman pujaActual + incremento' (-not (($pujaJs + $subastaJs) -match 'pujaActual\s*\+'))
+    $uiJs = Get-Content -Raw 'frontend/js/ui.js'
+    $salaJs = Get-Content -Raw 'frontend/js/sala.js'
+    $contadorJs = Get-Content -Raw 'frontend/js/contador.js'
+    $publicarJs = Get-Content -Raw 'frontend/js/publicar.js'
+    Resultado 'El front ya no decide vencimiento (sin estaVencida)' (-not ($uiJs -match 'estaVencida'))
+    Resultado 'sala.js no suma ofertas (usa el conteo del back)' (-not ($salaJs -match 'cantidadOfertas\+\+'))
+    Resultado 'contador.js descuenta contra la hora del servidor' ($contadorJs -match 'ahoraServidor')
+    Resultado 'publicar.js lee los limites de /config/auctions' ($publicarJs -match 'config/auctions')
 }
 finally {
     if ($procesoApi -and -not $procesoApi.HasExited) {
