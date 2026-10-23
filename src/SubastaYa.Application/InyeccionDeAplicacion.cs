@@ -11,6 +11,7 @@ public static class InyeccionDeAplicacion
 		this IServiceCollection servicios, IConfiguration configuracion)
 	{
 		servicios.Configure<OpcionesAntiSniping>(configuracion.GetSection(OpcionesAntiSniping.Seccion));
+		servicios.Configure<OpcionesPublicacion>(configuracion.GetSection(OpcionesPublicacion.Seccion));
 
 		servicios.AddScoped<IServicioDeUsuarios, ServicioDeUsuarios>();
 		servicios.AddScoped<IServicioDeAutenticacion, ServicioDeAutenticacion>();

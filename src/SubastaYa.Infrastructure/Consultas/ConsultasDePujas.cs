@@ -36,4 +36,7 @@ public class ConsultasDePujas : IConsultasDePujas
 			})
 			.ToListAsync();
 	}
+
+	public Task<int> ContarAsync(int subastaId)
+		=> _contexto.Pujas.CountAsync(p => p.SubastaId == subastaId);
 }

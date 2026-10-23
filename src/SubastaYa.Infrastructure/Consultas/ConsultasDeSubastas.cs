@@ -27,6 +27,8 @@ public class ConsultasDeSubastas : IConsultasDeSubastas
 
 		var totalElementos = await consulta.CountAsync();
 
+		var ahora = DateTime.UtcNow;
+
 		var items = await consulta
 			.Skip((filtro.Pagina - 1) * filtro.Tamano)
 			.Take(filtro.Tamano)
@@ -40,7 +42,8 @@ public class ConsultasDeSubastas : IConsultasDeSubastas
 				CantidadOfertas = s.Pujas.Count,
 				FechaInicio = s.FechaInicio,
 				FechaFin = s.FechaFin,
-				Estado = s.Estado.ToString()
+				Estado = s.Estado.ToString(),
+				FechaServidor = ahora
 			})
 			.ToListAsync();
 
@@ -49,6 +52,8 @@ public class ConsultasDeSubastas : IConsultasDeSubastas
 
 	public async Task<SubastaDetalleResponse> ObtenerDetalleAsync(int id)
 	{
+		var ahora = DateTime.UtcNow;
+
 		return await _contexto.Subastas
 			.AsNoTracking()
 			.Where(s => s.Id == id)
@@ -67,7 +72,8 @@ public class ConsultasDeSubastas : IConsultasDeSubastas
 				FechaFin = s.FechaFin,
 				Estado = s.Estado.ToString(),
 				SeudonimoVendedor = s.Vendedor.Seudonimo,
-				SeudonimoLider = (s.Lider == null) ? null : s.Lider.Seudonimo
+				SeudonimoLider = (s.Lider == null) ? null : s.Lider.Seudonimo,
+				FechaServidor = ahora
 			})
 			.FirstOrDefaultAsync()
 			?? throw new RecursoNoEncontradoException("La subasta no existe.");

@@ -1,3 +1,4 @@
+using SubastaYa.Application.Consultas;
 using SubastaYa.Application.DTOs.Salida;
 using SubastaYa.Domain.Entidades;
 using SubastaYa.Domain.Repositorios;
@@ -10,17 +11,20 @@ public class ServicioDePujas : IServicioDePujas
 	private readonly IRegistradorDePujas _registrador;
 	private readonly IUsuarioRepository _usuarios;
 	private readonly INotificadorDeSubastas _notificador;
+	private readonly IConsultasDePujas _consultas;
 
 	public ServicioDePujas(
 		IValidadorDePujas validador,
 		IRegistradorDePujas registrador,
 		IUsuarioRepository usuarios,
-		INotificadorDeSubastas notificador)
+		INotificadorDeSubastas notificador,
+		IConsultasDePujas consultas)
 	{
 		_validador = validador;
 		_registrador = registrador;
 		_usuarios = usuarios;
 		_notificador = notificador;
+		_consultas = consultas;
 	}
 
 	/// Valida la oferta, mueve la plata y avisa a la sala.
@@ -47,6 +51,7 @@ public class ServicioDePujas : IServicioDePujas
 			Monto = resultado.Puja.Monto,
 			FechaPuja = resultado.Puja.FechaPuja,
 			Seudonimo = seudonimo,
+			CantidadOfertas = await _consultas.ContarAsync(subasta.Id),
 			FechaFin = subasta.FechaFin,
 			MontoMinimo = subasta.MontoMinimo,
 			TiempoExtendido = resultado.TiempoExtendido
