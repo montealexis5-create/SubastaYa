@@ -11,10 +11,14 @@ public static class InyeccionDeAplicacion
 		this IServiceCollection servicios, IConfiguration configuracion)
 	{
 		servicios.Configure<OpcionesAntiSniping>(configuracion.GetSection(OpcionesAntiSniping.Seccion));
+		servicios.Configure<OpcionesPublicacion>(configuracion.GetSection(OpcionesPublicacion.Seccion));
+
+		servicios.AddSingleton<IReloj, RelojDelSistema>();
 
 		servicios.AddScoped<IServicioDeUsuarios, ServicioDeUsuarios>();
 		servicios.AddScoped<IServicioDeAutenticacion, ServicioDeAutenticacion>();
 		servicios.AddScoped<IServicioDeSubastas, ServicioDeSubastas>();
+		servicios.AddScoped<IServicioDeConfiguracion, ServicioDeConfiguracion>();
 		servicios.AddScoped<IServicioDeBilleteras, ServicioDeBilleteras>();
 		servicios.AddScoped<IServicioDeAuditoria, ServicioDeAuditoria>();
 		servicios.AddScoped<IMovimientosDeSaldo, MovimientosDeSaldo>();

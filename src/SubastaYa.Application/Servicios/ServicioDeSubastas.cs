@@ -1,3 +1,5 @@
+using Microsoft.Extensions.Options;
+using SubastaYa.Application.Configuracion;
 using SubastaYa.Application.Consultas;
 using SubastaYa.Application.DTOs.Entrada;
 using SubastaYa.Application.DTOs.Salida;
@@ -11,27 +13,30 @@ namespace SubastaYa.Application.Servicios;
 
 public class ServicioDeSubastas : IServicioDeSubastas
 {
-	private const int DiasDeDuracionMaxima = 365;
-	private const int MinutosDeToleranciaInicio = 5;
-
-	private static readonly TimeSpan DuracionMaxima = TimeSpan.FromDays(DiasDeDuracionMaxima);
-	private static readonly TimeSpan ToleranciaInicioPasado = TimeSpan.FromMinutes(MinutosDeToleranciaInicio);
+	private readonly TimeSpan _duracionMaxima;
+	private readonly TimeSpan _toleranciaInicioPasado;
 
 	private readonly ISubastaRepository _subastas;
 	private readonly ICategoriaRepository _categorias;
 	private readonly IConsultasDeSubastas _consultas;
 	private readonly IUnitOfWork _unidad;
+	private readonly IReloj _reloj;
 
 	public ServicioDeSubastas(
 		ISubastaRepository subastas,
 		ICategoriaRepository categorias,
 		IConsultasDeSubastas consultas,
-		IUnitOfWork unidad)
+		IUnitOfWork unidad,
+		IOptions<OpcionesPublicacion> opciones,
+		IReloj reloj)
 	{
 		_subastas = subastas;
 		_categorias = categorias;
 		_consultas = consultas;
 		_unidad = unidad;
+		_reloj = reloj;
+		_duracionMaxima = TimeSpan.FromDays(opciones.Value.DuracionMaximaDias);
+		_toleranciaInicioPasado = TimeSpan.FromMinutes(opciones.Value.ToleranciaInicioMinutos);
 	}
 
 	public async Task<SubastaDetalleResponse> PublicarAsync(PublicarSubastaRequest request, int vendedorId)
@@ -41,7 +46,7 @@ public class ServicioDeSubastas : IServicioDeSubastas
 			throw new ReglaDeNegocioException($"No existe una categoría con id {request.CategoriaId}.");
 		}
 
-		var ahora = DateTime.UtcNow;
+		var ahora = _reloj.AhoraUtc;
 		var fechaInicio = AUtc(request.FechaInicio!.Value);
 		var fechaFin = AUtc(request.FechaFin!.Value);
 
@@ -55,9 +60,9 @@ public class ServicioDeSubastas : IServicioDeSubastas
 		return await _consultas.ObtenerDetalleAsync(subasta.Id);
 	}
 
-	private static void ValidarFechas(DateTime fechaInicio, DateTime fechaFin, DateTime ahora)
+	private void ValidarFechas(DateTime fechaInicio, DateTime fechaFin, DateTime ahora)
 	{
-		if (fechaInicio < ahora - ToleranciaInicioPasado)
+		if (fechaInicio < ahora - _toleranciaInicioPasado)
 		{
 			throw new ReglaDeNegocioException("La fecha de inicio no puede estar en el pasado.");
 		}
@@ -72,7 +77,7 @@ public class ServicioDeSubastas : IServicioDeSubastas
 			throw new ReglaDeNegocioException("La fecha de fin debe ser posterior al momento actual.");
 		}
 
-		var limite = ahora + DuracionMaxima;
+		var limite = ahora + _duracionMaxima;
 		if (fechaFin > limite)
 		{
 			throw new ReglaDeNegocioException($"La subasta no puede terminar más allá del {limite:dd/MM/yyyy}.");

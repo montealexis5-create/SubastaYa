@@ -1,5 +1,3 @@
-using System.ComponentModel.DataAnnotations.Schema;
-
 namespace SubastaYa.Domain.Entidades;
 
 public class Billetera
@@ -12,7 +10,6 @@ public class Billetera
 	public decimal SaldoRetenido { get; set; }
 	public int Version { get; set; }
 
-	[NotMapped]
 	public decimal SaldoDisponible => SaldoTotal - SaldoRetenido;
 
 	public Usuario Usuario { get; set; } = null!;

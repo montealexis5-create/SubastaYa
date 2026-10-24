@@ -16,17 +16,20 @@ public class ServicioDeBilleteras : IServicioDeBilleteras
 	private readonly IAsientoLedgerRepository _ledger;
 	private readonly IServicioDeAuditoria _auditoria;
 	private readonly IUnitOfWork _unidad;
+	private readonly IReloj _reloj;
 
 	public ServicioDeBilleteras(
 		IBilleteraRepository billeteras,
 		IAsientoLedgerRepository ledger,
 		IServicioDeAuditoria auditoria,
-		IUnitOfWork unidad)
+		IUnitOfWork unidad,
+		IReloj reloj)
 	{
 		_billeteras = billeteras;
 		_ledger = ledger;
 		_auditoria = auditoria;
 		_unidad = unidad;
+		_reloj = reloj;
 	}
 
 	/// El saldo y su asiento entran juntos o no entra ninguno.
@@ -41,7 +44,7 @@ public class ServicioDeBilleteras : IServicioDeBilleteras
 		billetera.Acreditar(monto);
 
 		await _ledger.AgregarAsync(AsientoLedger.Nuevo(
-			billetera.Id, TipoAsiento.Deposito, monto, DescripcionesDeAsiento.Deposito, DateTime.UtcNow));
+			billetera.Id, TipoAsiento.Deposito, monto, DescripcionesDeAsiento.Deposito, _reloj.AhoraUtc));
 
 		await GuardarAsync();
 

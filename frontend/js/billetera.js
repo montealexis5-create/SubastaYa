@@ -1,9 +1,9 @@
-const TIPOS_MOVIMIENTO = {
-    Deposito:   { nombre: 'Depósito',                         efecto: 'suma' },
-    Cobro:      { nombre: 'Cobro',                            efecto: 'suma' },
-    Pago:       { nombre: 'Pago',                             efecto: 'resta' },
-    Retencion:  { nombre: 'Retención',                        efecto: 'reserva' },
-    Liberacion: { nombre: 'Liberación',                       efecto: 'reserva' }
+const NOMBRES_MOVIMIENTO = {
+    Deposito:   'Depósito',
+    Cobro:      'Cobro',
+    Pago:       'Pago',
+    Retencion:  'Retención',
+    Liberacion: 'Liberación'
 };
 
 const PRESENTACION_EFECTO = {
@@ -79,8 +79,7 @@ function dibujarMovimientos(pagina, agregar) {
 }
 
 function crearFila(movimiento) {
-    const tipo = TIPOS_MOVIMIENTO[movimiento.tipo] ?? { nombre: movimiento.tipo, efecto: 'reserva' };
-    const presentacion = PRESENTACION_EFECTO[tipo.efecto];
+    const presentacion = PRESENTACION_EFECTO[movimiento.efecto];
     const fila = document.createElement('tr');
 
     const fecha = document.createElement('td');
@@ -88,7 +87,7 @@ function crearFila(movimiento) {
     fecha.textContent = formatearFecha(movimiento.fecha);
 
     const nombreTipo = document.createElement('td');
-    nombreTipo.textContent = tipo.nombre;
+    nombreTipo.textContent = NOMBRES_MOVIMIENTO[movimiento.tipo] ?? movimiento.tipo;
 
     const detalle = document.createElement('td');
     detalle.textContent = movimiento.descripcion ?? '';

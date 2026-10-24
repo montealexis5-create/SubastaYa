@@ -32,8 +32,18 @@ function textoDeOfertas(cantidad) {
     return cantidad === 1 ? '1 oferta' : `${cantidad} ofertas`;
 }
 
-function estaVencida(subasta) {
-    return subasta.estado === 'Activa' && new Date(subasta.fechaFin) <= new Date();
+let desfaseServidorMs = 0;
+
+// El back manda su hora (fechaServidor). Guardamos la diferencia con el reloj local
+// para que el contador descuente contra la hora del servidor y no contra la de la PC.
+function sincronizarReloj(fechaServidorIso) {
+    if (fechaServidorIso) {
+        desfaseServidorMs = Date.parse(fechaServidorIso) - Date.now();
+    }
+}
+
+function ahoraServidor() {
+    return Date.now() + desfaseServidorMs;
 }
 
 async function poblarCategorias(select) {

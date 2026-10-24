@@ -13,10 +13,12 @@ public class ServicioDeAuditoria : IServicioDeAuditoria
 		new() { Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping };
 
 	private readonly IRegistroAuditoriaRepository _repositorio;
+	private readonly IReloj _reloj;
 
-	public ServicioDeAuditoria(IRegistroAuditoriaRepository repositorio)
+	public ServicioDeAuditoria(IRegistroAuditoriaRepository repositorio, IReloj reloj)
 	{
 		_repositorio = repositorio;
+		_reloj = reloj;
 	}
 
 	public async Task RegistrarAsync(
@@ -29,7 +31,7 @@ public class ServicioDeAuditoria : IServicioDeAuditoria
 			Accion = accion,
 			UsuarioId = usuarioId,
 			DetalleJson = (detalle is null) ? DetalleVacio : JsonSerializer.Serialize(detalle, OpcionesDetalle),
-			Fecha = DateTime.UtcNow
+			Fecha = _reloj.AhoraUtc
 		});
 	}
 }

@@ -39,7 +39,7 @@ public class CierreDeSubastas : ICierreDeSubastas
 
 	public async Task CerrarAsync(int subastaId, DateTime ahora, CancellationToken cancelacion)
 	{
-		var subasta = await _subastas.ObtenerActivaVencidaAsync(subastaId, ahora, cancelacion);
+		var subasta = await _subastas.ObtenerAsync(subastaId, Subasta.Vencida(ahora), cancelacion);
 		if (subasta is null)
 		{
 			return;

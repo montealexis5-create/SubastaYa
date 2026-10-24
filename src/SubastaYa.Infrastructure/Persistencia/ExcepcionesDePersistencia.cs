@@ -13,4 +13,7 @@ public static class ExcepcionesDePersistencia
 			SqlState: PostgresErrorCodes.CheckViolation,
 			ConstraintName: SaldoRetenidoNoNegativo
 		};
+
+	public static bool EsViolacionDeUnicidad(this DbUpdateException excepcion) =>
+		excepcion.InnerException is PostgresException { SqlState: PostgresErrorCodes.UniqueViolation };
 }

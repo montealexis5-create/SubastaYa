@@ -10,7 +10,7 @@ function pintar(elemento, clase) {
 function actualizarContadores() {
     document.querySelectorAll('[data-fecha-fin]').forEach(elemento => {
         const fin = new Date(elemento.dataset.fechaFin);
-        const restante = fin - new Date();
+        const restante = fin - ahoraServidor();
 
         if (restante <= 0) {
             elemento.textContent = 'Finalizando…';

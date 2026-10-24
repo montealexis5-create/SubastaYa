@@ -11,15 +11,18 @@ public class ValidadorDePujas : IValidadorDePujas
 	private readonly ISubastaRepository _subastas;
 	private readonly IBilleteraRepository _billeteras;
 	private readonly IServicioDeAuditoria _auditoria;
+	private readonly IReloj _reloj;
 
 	public ValidadorDePujas(
 		ISubastaRepository subastas,
 		IBilleteraRepository billeteras,
-		IServicioDeAuditoria auditoria)
+		IServicioDeAuditoria auditoria,
+		IReloj reloj)
 	{
 		_subastas = subastas;
 		_billeteras = billeteras;
 		_auditoria = auditoria;
+		_reloj = reloj;
 	}
 
 	/// Rechaza lo que no puede ser una oferta antes de tocar plata.
@@ -55,7 +58,7 @@ public class ValidadorDePujas : IValidadorDePujas
 			throw await RechazarPorReglaAsync(subasta, usuarioId, monto, "La subasta no está activa.");
 		}
 
-		if (DateTime.UtcNow >= subasta.FechaFin)
+		if (_reloj.AhoraUtc >= subasta.FechaFin)
 		{
 			throw await RechazarPorReglaAsync(subasta, usuarioId, monto, "La subasta ya venció.");
 		}

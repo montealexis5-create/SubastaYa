@@ -19,6 +19,7 @@ public class RegistradorDePujas : IRegistradorDePujas
 	private readonly IServicioDeAuditoria _auditoria;
 	private readonly IUnitOfWork _unidad;
 	private readonly OpcionesAntiSniping _antiSniping;
+	private readonly IReloj _reloj;
 
 	public RegistradorDePujas(
 		IMovimientosDeSaldo saldos,
@@ -26,7 +27,8 @@ public class RegistradorDePujas : IRegistradorDePujas
 		ISubastaRepository subastas,
 		IServicioDeAuditoria auditoria,
 		IUnitOfWork unidad,
-		IOptions<OpcionesAntiSniping> antiSniping)
+		IOptions<OpcionesAntiSniping> antiSniping,
+		IReloj reloj)
 	{
 		_saldos = saldos;
 		_pujas = pujas;
@@ -34,6 +36,7 @@ public class RegistradorDePujas : IRegistradorDePujas
 		_auditoria = auditoria;
 		_unidad = unidad;
 		_antiSniping = antiSniping.Value;
+		_reloj = reloj;
 	}
 
 	/// Todo en una sola transaccion: libera al lider anterior, retiene al nuevo y guarda la puja.
@@ -57,7 +60,7 @@ public class RegistradorDePujas : IRegistradorDePujas
 	private async Task<ResultadoDeOferta> AplicarAsync(
 		Subasta subasta, Billetera billetera, int usuarioId, decimal monto)
 	{
-		var ahora = DateTime.UtcNow;
+		var ahora = _reloj.AhoraUtc;
 		var fechaFinAnterior = subasta.FechaFin;
 
 		if (subasta.LiderId is int liderAnteriorId)
@@ -99,7 +102,8 @@ public class RegistradorDePujas : IRegistradorDePujas
 		await transaccion.RollbackAsync();
 		_unidad.ClearTracking();
 
-		var actual = await _subastas.ObtenerEstadoDeOfertaAsync(subastaId);
+		var actual = await _subastas.ObtenerPorIdAsync(subastaId)
+			?? throw new RecursoNoEncontradoException("La subasta no existe.");
 
 		await _auditoria.RegistrarAsync(
 			EntidadesAuditables.Subasta, subastaId, AccionesAuditoria.PujaRechazadaConcurrencia,

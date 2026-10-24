@@ -32,8 +32,13 @@ var app = builder.Build();
 
 app.UseMiddleware<ManejadorDeExcepcionesMiddleware>();
 
-app.UseSwagger();
-app.UseSwaggerUI();
+// Solo en desarrollo: Swagger y los datos de prueba.
+if (app.Environment.IsDevelopment())
+{
+	app.UseSwagger();
+	app.UseSwaggerUI();
+	app.Services.AplicarDatosSemilla();
+}
 
 app.UseCors(PoliticaCors.Frontend);
 
@@ -42,5 +47,4 @@ app.UseAuthorization();
 
 app.MapControllers();
 app.MapHub<SubastaHub>("/hubs/subastas");
-app.Services.AplicarDatosSemilla();
 app.Run();

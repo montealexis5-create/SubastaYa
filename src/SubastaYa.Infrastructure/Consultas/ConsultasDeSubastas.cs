@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using SubastaYa.Application.Consultas;
 using SubastaYa.Application.DTOs.Entrada;
 using SubastaYa.Application.DTOs.Salida;
+using SubastaYa.Application.Servicios;
 using SubastaYa.Domain.Entidades;
 using SubastaYa.Domain.Enums;
 using SubastaYa.Domain.Excepciones;
@@ -15,15 +16,18 @@ public class ConsultasDeSubastas : IConsultasDeSubastas
 	private const string OrdenPorReciente = "reciente";
 
 	private readonly AppDbContext _contexto;
+	private readonly IReloj _reloj;
 
-	public ConsultasDeSubastas(AppDbContext contexto)
+	public ConsultasDeSubastas(AppDbContext contexto, IReloj reloj)
 	{
 		_contexto = contexto;
+		_reloj = reloj;
 	}
 
 	public async Task<PaginaResponse<SubastaTarjetaResponse>> ObtenerCatalogoAsync(FiltroSubastasRequest filtro)
 	{
-		var consulta = Ordenar(Filtrar(_contexto.Subastas.AsNoTracking(), filtro), filtro.Orden);
+		var ahora = _reloj.AhoraUtc;
+		var consulta = Ordenar(Filtrar(_contexto.Subastas.AsNoTracking(), filtro), filtro.Orden, ahora);
 
 		var totalElementos = await consulta.CountAsync();
 
@@ -40,7 +44,8 @@ public class ConsultasDeSubastas : IConsultasDeSubastas
 				CantidadOfertas = s.Pujas.Count,
 				FechaInicio = s.FechaInicio,
 				FechaFin = s.FechaFin,
-				Estado = s.Estado.ToString()
+				Estado = s.Estado.ToString(),
+				FechaServidor = ahora
 			})
 			.ToListAsync();
 
@@ -49,6 +54,8 @@ public class ConsultasDeSubastas : IConsultasDeSubastas
 
 	public async Task<SubastaDetalleResponse> ObtenerDetalleAsync(int id)
 	{
+		var ahora = _reloj.AhoraUtc;
+
 		return await _contexto.Subastas
 			.AsNoTracking()
 			.Where(s => s.Id == id)
@@ -67,7 +74,8 @@ public class ConsultasDeSubastas : IConsultasDeSubastas
 				FechaFin = s.FechaFin,
 				Estado = s.Estado.ToString(),
 				SeudonimoVendedor = s.Vendedor.Seudonimo,
-				SeudonimoLider = (s.Lider == null) ? null : s.Lider.Seudonimo
+				SeudonimoLider = (s.Lider == null) ? null : s.Lider.Seudonimo,
+				FechaServidor = ahora
 			})
 			.FirstOrDefaultAsync()
 			?? throw new RecursoNoEncontradoException("La subasta no existe.");
@@ -75,32 +83,38 @@ public class ConsultasDeSubastas : IConsultasDeSubastas
 
 	public async Task<IReadOnlyList<MiPublicacionResponse>> ObtenerPublicacionesAsync(int vendedorId)
 	{
-		return await _contexto.Subastas
+		var publicaciones = await _contexto.Subastas
 			.AsNoTracking()
 			.Where(s => s.VendedorId == vendedorId)
 			.OrderByDescending(s => s.FechaCreacion)
-			.Select(s => new MiPublicacionResponse
+			.Select(s => new
 			{
-				Id = s.Id,
-				Titulo = s.Titulo,
-				UrlImagen = s.UrlImagen,
-				Estado = s.Estado.ToString(),
-				PujaActual = s.PujaActual,
+				s.Id,
+				s.Titulo,
+				s.UrlImagen,
+				s.Estado,
+				s.PujaActual,
 				CantidadOfertas = s.Pujas.Count,
-				FechaFin = s.FechaFin,
-				Recaudado = (s.Estado == EstadoSubasta.Finalizada) ? s.PujaActual : 0m,
-				EstadoAdjudicacion = (s.Estado == EstadoSubasta.Finalizada)
-					? "Adjudicada"
-					: (s.Estado == EstadoSubasta.Desierta)
-						? "Desierta"
-						: (s.Estado == EstadoSubasta.Programada)
-							? "Programada"
-							: "En curso",
-				SeudonimoGanador = (s.Estado == EstadoSubasta.Finalizada && s.Lider != null)
-					? s.Lider.Seudonimo
-					: null
+				s.FechaFin,
+				SeudonimoLider = (s.Lider == null) ? null : s.Lider.Seudonimo
 			})
 			.ToListAsync();
+
+		return publicaciones
+			.Select(p => new MiPublicacionResponse
+			{
+				Id = p.Id,
+				Titulo = p.Titulo,
+				UrlImagen = p.UrlImagen,
+				Estado = p.Estado.ToString(),
+				PujaActual = p.PujaActual,
+				CantidadOfertas = p.CantidadOfertas,
+				FechaFin = p.FechaFin,
+				Recaudado = ResultadosDeSubasta.Recaudado(p.Estado, p.PujaActual),
+				EstadoAdjudicacion = ResultadosDeSubasta.ParaVendedor(p.Estado),
+				SeudonimoGanador = ResultadosDeSubasta.Ganador(p.Estado, p.SeudonimoLider)
+			})
+			.ToList();
 	}
 
 	private static IQueryable<Subasta> Filtrar(IQueryable<Subasta> consulta, FiltroSubastasRequest filtro)
@@ -133,10 +147,8 @@ public class ConsultasDeSubastas : IConsultasDeSubastas
 		return consulta;
 	}
 
-	private static IQueryable<Subasta> Ordenar(IQueryable<Subasta> consulta, string? orden)
+	private static IQueryable<Subasta> Ordenar(IQueryable<Subasta> consulta, string? orden, DateTime ahora)
 	{
-		var ahora = DateTime.UtcNow;
-
 		return orden switch
 		{
 			OrdenPorPuja => consulta.OrderByDescending(s => s.PujaActual),

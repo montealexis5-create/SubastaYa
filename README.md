@@ -200,11 +200,25 @@ cd SubastaYa
 
 ### 2. Levantar la base de datos
 
+Las contraseñas de PostgreSQL y de pgAdmin no están en el repositorio: se leen de un
+archivo `.env` que git ignora. Se crea a partir del ejemplo y se le cambian los valores:
+
+```bash
+cp .env.example .env
+```
+
+En PowerShell: `Copy-Item .env.example .env`. Después:
+
 ```bash
 docker compose up -d
 ```
 
-Levanta dos contenedores: PostgreSQL 16 en el puerto `5432` y pgAdmin en el `5050`.
+Levanta dos contenedores: PostgreSQL 16 en el puerto `5432` y pgAdmin en el `5050`. Los
+dos puertos quedan abiertos solo para la propia máquina.
+
+Las contraseñas solo se aplican la primera vez que se crea cada volumen. Si los
+contenedores ya existían con otra contraseña, el `.env` tiene que usar esa misma, o hay
+que borrar los volúmenes con `docker compose down -v` (borra los datos).
 
 ### 3. Configurar los secretos
 
@@ -214,12 +228,12 @@ proyecto. El repositorio es público, y quien tenga la clave de firma puede gene
 token válido para cualquier usuario.
 
 ```bash
-dotnet user-secrets set "ConnectionStrings:Default" "Host=localhost;Port=5432;Database=subastaya;Username=subastaya;Password=subastaya_dev" -p src/SubastaYa.Api
+dotnet user-secrets set "ConnectionStrings:Default" "Host=localhost;Port=5432;Database=subastaya;Username=subastaya;Password=<POSTGRES_PASSWORD del .env>" -p src/SubastaYa.Api
 
-dotnet user-secrets set "Jwt:Clave" "clave-de-desarrollo-de-al-menos-32-caracteres" -p src/SubastaYa.Api
+dotnet user-secrets set "Jwt:Clave" "<un texto propio de 32 caracteres o más>" -p src/SubastaYa.Api
 ```
 
-La cadena es la que corresponde al `docker-compose.yml` de este repositorio. La clave
+En la cadena va la misma contraseña que en `POSTGRES_PASSWORD` del `.env`. La clave
 puede ser cualquier texto, pero **de 32 caracteres o más**: el algoritmo de firma
 necesita una clave de ese tamaño, y con una más corta la aplicación arranca igual pero
 falla al iniciar sesión, cuando tiene que firmar el token.
@@ -244,7 +258,9 @@ dotnet run --project src/SubastaYa.Api
 ```
 
 Queda escuchando en `http://localhost:5093` y la documentación interactiva está en
-`http://localhost:5093/swagger`.
+`http://localhost:5093/swagger`. Swagger y los datos de prueba solo se activan en el
+ambiente `Development`, que es el que usa `dotnet run` por el perfil de
+`launchSettings.json`.
 
 **Los datos de prueba se cargan solos** la primera vez, con la base vacía. Si ya hay
 usuarios cargados, el sembrado no hace nada.
@@ -268,9 +284,10 @@ La dirección de la API está en `frontend/js/config.js`, por si se cambia el pu
 
 ### 7. pgAdmin (opcional)
 
-`http://localhost:5050`, con `admin@subastaya.com` y contraseña `admin`. Al registrar el
-servidor, el host es **`db`** —el nombre del contenedor dentro de la red de Docker—, no
-`localhost`; el resto de los datos son los del `docker-compose.yml`.
+`http://localhost:5050`, con `admin@subastaya.com` y la contraseña `PGADMIN_PASSWORD` del
+`.env`. Al registrar el servidor, el host es **`db`** —el nombre del contenedor dentro de
+la red de Docker—, no `localhost`; el usuario y la base son los del `docker-compose.yml`
+y la contraseña es `POSTGRES_PASSWORD`.
 
 ### Empezar de nuevo
 

@@ -11,4 +11,6 @@ public class SubastaTarjetaResponse
 	public DateTime FechaInicio { get; set; }
 	public DateTime FechaFin { get; set; }
 	public string Estado { get; set; } = null!;
+
+	public DateTime FechaServidor { get; set; }
 }
