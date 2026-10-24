@@ -1,3 +1,7 @@
+// Mis actividades: las subastas en las que el usuario oferto y las que publico.
+
+// Nombre visible de cada estado de subasta. "Programada" es el valor del enum; el
+// enunciado a esas subastas las llama "Proximas".
 const NOMBRES_ESTADO = {
     Programada: 'Próxima',
     Activa: 'Activa',
@@ -5,6 +9,7 @@ const NOMBRES_ESTADO = {
     Desierta: 'Desierta'
 };
 
+// Color de cada resultado. Los textos los arma el servidor; aca solo se elige como se ven.
 const COLORES_RESULTADO = {
     'Liderando': 'text-bg-success',
     'Superado':  'text-bg-warning',
@@ -19,28 +24,32 @@ const COLORES_ADJUDICACION = {
     'Desierta':   'text-bg-secondary'
 };
 
+// Las dos pestanas comparten la forma de cargarse y solo cambian de donde leen y como
+// arman cada fila.
 const PESTANAS = {
     compras:       { ruta: '/users/me/bids',     crearFila: crearFilaCompra,      cargada: false },
     publicaciones: { ruta: '/users/me/auctions', crearFila: crearFilaPublicacion, cargada: false }
 };
 
 document.addEventListener('DOMContentLoaded', () => {
+    // requiereSesion ya redirigio al login: sin este corte, la pantalla llegaria a pedir
+    // datos sin token y mostraria un error antes de irse.
     if (!haySesion()) return;
 
     cargarPestana('compras');
 
+    // La segunda pestana se carga recien la primera vez que se abre: si el usuario nunca
+    // la mira, no se hace esa consulta.
     document.getElementById('pestana-publicaciones').addEventListener('shown.bs.tab', () => {
         if (!PESTANAS.publicaciones.cargada) cargarPestana('publicaciones');
     });
 });
 
 function mostrarEstado(prefijo, estado) {
-    const secciones = {
-        cargando: `cargando-${prefijo}`,
-        vacio: `vacio-${prefijo}`,
-        exito: `tabla-${prefijo}`
-    };
-    mostrarSecciones(secciones, estado, `alerta-${prefijo}`);
+    document.getElementById(`cargando-${prefijo}`).hidden = estado !== 'cargando';
+    document.getElementById(`vacio-${prefijo}`).hidden    = estado !== 'vacio';
+    document.getElementById(`tabla-${prefijo}`).hidden    = estado !== 'exito';
+    if (estado !== 'error') ocultarAlerta(`alerta-${prefijo}`);
 }
 
 async function cargarPestana(prefijo) {
@@ -76,11 +85,15 @@ function crearFilaCompra(participacion) {
 }
 
 function crearFilaPublicacion(publicacion) {
+    // El servidor usa "Programada" tambien como estado de adjudicacion; se muestra con el
+    // mismo nombre que en la columna Estado para que la fila no diga dos cosas distintas.
     const valorAdjudicacion = publicacion.estadoAdjudicacion;
     const adjudicacion = celdaEtiqueta(
         NOMBRES_ESTADO[valorAdjudicacion] ?? valorAdjudicacion,
         COLORES_ADJUDICACION[valorAdjudicacion]);
 
+    // El ganador va aparte y no dentro de la etiqueta: el servidor manda los dos datos
+    // separados justamente para que la pantalla decida como mostrarlos.
     if (publicacion.seudonimoGanador) {
         const ganador = document.createElement('div');
         ganador.className = 'small text-muted mt-1';
@@ -98,6 +111,8 @@ function crearFilaPublicacion(publicacion) {
     ]);
 }
 
+// Constructores de celdas. Todo el contenido entra con textContent: los titulos los
+// escribieron otros usuarios y no se interpretan como HTML.
 function crearFila(celdas) {
     const fila = document.createElement('tr');
     fila.append(...celdas);

@@ -10,20 +10,11 @@ document.addEventListener('DOMContentLoaded', () => {
     cargarDetalle(id);
 });
 
-const SECCIONES = {
-    cargando: 'cargando-subasta',
-    detalle: 'detalle-subasta',
-    'no-encontrada': 'no-encontrada'
-};
-
-const CLASES_ESTADO = {
-    Activa: 'text-bg-success',
-    Programada: 'text-bg-secondary',
-    Finalizada: 'text-bg-primary'
-};
-
 function mostrarEstado(estado) {
-    mostrarSecciones(SECCIONES, estado, 'alerta-subasta');
+    document.getElementById('cargando-subasta').hidden = estado !== 'cargando';
+    document.getElementById('detalle-subasta').hidden  = estado !== 'detalle';
+    document.getElementById('no-encontrada').hidden     = estado !== 'no-encontrada';
+    if (estado !== 'error') ocultarAlerta('alerta-subasta');
 }
 
 async function cargarDetalle(id) {
@@ -45,7 +36,6 @@ async function cargarDetalle(id) {
 
 function dibujarDetalle(detalle) {
     sincronizarReloj(detalle.fechaServidor);
-
     document.title = `${detalle.titulo} — SubastaYa`;
 
     document.getElementById('categoria').textContent = detalle.nombreCategoria;
@@ -59,13 +49,17 @@ function dibujarDetalle(detalle) {
 
     document.getElementById('oferta-minima').textContent = formatearPesos(detalle.montoMinimo);
 
-    document.getElementById('ofertas').textContent = textoDeOfertas(detalle.cantidadOfertas);
+    const cantidadOfertas = detalle.cantidadOfertas;
+    document.getElementById('ofertas').textContent =
+        cantidadOfertas === 1 ? '1 oferta' : cantidadOfertas === 0 ? 'Sin ofertas' : `${cantidadOfertas} ofertas`;
 
     document.getElementById('lider').textContent = detalle.seudonimoLider ?? 'Todavía nadie';
 
     dibujarEstadoYTiempo(detalle);
     dibujarFoto(detalle);
 
+    // Avisa a los otros scripts de la pantalla (sala en vivo y formulario de oferta)
+    // que el detalle esta dibujado, con los datos con los que se dibujo.
     document.dispatchEvent(new CustomEvent('subasta:cargada', { detail: detalle }));
 }
 
@@ -73,26 +67,41 @@ function dibujarEstadoYTiempo(detalle) {
     const badgeEstado = document.getElementById('estado');
     const tiempo = document.getElementById('tiempo');
 
+    // Entre que vence la fecha de fin y el proceso que cierra las subastas la procesa, el
+    // backend todavía la informa como Activa. En ese intervalo se muestra "Finalizando…"
+    // en lugar de un badge "Activa" que contradiga al contador. Mismo criterio que catalogo.js.
+    const yaVencida = detalle.estado === 'Activa' && new Date(detalle.fechaFin) <= ahoraServidor();
+    const estadoVisual = yaVencida ? 'Vencida' : detalle.estado;
+
     const etiquetas = {
         Programada: 'Próxima',
         Activa: 'Activa',
         Finalizada: 'Finalizada',
-        Desierta: 'Desierta'
+        Desierta: 'Desierta',
+        Vencida: 'Finalizando…' // aún no sabemos si hubo ganador o quedó desierta; eso lo decide el Worker
     };
-    badgeEstado.textContent = etiquetas[detalle.estado] ?? detalle.estado;
-    badgeEstado.className = `badge ${CLASES_ESTADO[detalle.estado] ?? 'text-bg-dark'}`;
+    badgeEstado.textContent = etiquetas[estadoVisual] ?? estadoVisual;
+    badgeEstado.className = 'badge ' + (
+        estadoVisual === 'Activa' ? 'text-bg-success' :
+        estadoVisual === 'Programada' ? 'text-bg-secondary' :
+        estadoVisual === 'Finalizada' ? 'text-bg-primary' :
+        estadoVisual === 'Vencida' ? 'text-bg-warning' :
+        'text-bg-dark'
+    );
 
-    if (detalle.estado === 'Programada') {
+    if (estadoVisual === 'Programada') {
         tiempo.textContent = `Comienza el ${formatearFecha(detalle.fechaInicio)}`;
-    } else if (detalle.estado === 'Activa') {
+    } else if (estadoVisual === 'Activa') {
         tiempo.innerHTML = '';
         const span = document.createElement('span');
         span.className = 'contador';
         span.dataset.fechaFin = detalle.fechaFin;
         tiempo.appendChild(span);
-    } else if (detalle.estado === 'Finalizada') {
+    } else if (estadoVisual === 'Vencida') {
+        tiempo.textContent = 'Esperando cierre del sistema';
+    } else if (estadoVisual === 'Finalizada') {
         tiempo.textContent = `Ganó ${detalle.seudonimoLider}`;
-    } else if (detalle.estado === 'Desierta') {
+    } else if (estadoVisual === 'Desierta') {
         tiempo.textContent = 'Terminó sin ofertas';
     }
 }

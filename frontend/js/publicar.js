@@ -1,38 +1,60 @@
+// Limites que define el back (GET /config/auctions). Solo guian al usuario en pantalla:
+// el back los valida igual al enviar.
+let toleranciaInicioMs = null;
+let duracionMaximaMs = null;
+
+async function cargarLimites() {
+    try {
+        const config = await api.get('/config/auctions');
+        toleranciaInicioMs = config.toleranciaInicioMinutos * 60 * 1000;
+        duracionMaximaMs = config.duracionMaximaDias * 24 * 60 * 60 * 1000;
+    } catch {
+        // Sin limites no se avisa en pantalla; el back valida al enviar.
+    }
+}
+
 document.addEventListener('DOMContentLoaded', () => {
     cargarCategorias();
     configurarVistaPrevia();
-    configurarLimitesDeFecha();
+    cargarLimites().then(configurarLimitesDeFecha);
     limitarADosDecimales(document.getElementById('precio-base'));
     limitarADosDecimales(document.getElementById('incremento'));
     configurarEnvio();
 });
 
-async function cargarCategorias() {
-    try {
-        await poblarCategorias(document.getElementById('categoria'));
-    } catch {
-        mostrarAlerta('alerta-publicar', 'No se pudieron cargar las categorías. Recargá la página.', 'danger');
-    }
+// El calendario en gris fuera de rango es una comodidad del navegador: la regla real
+// la aplica el servidor. Sin esto, escribir un ano de mas de cuatro digitos deja el
+// campo invalido pero no lo avisa hasta enviar.
+function configurarLimitesDeFecha() {
+    if (toleranciaInicioMs === null) return;
+
+    const inicioMinimo = new Date(Date.now() - toleranciaInicioMs);
+    const finMaximo = new Date(Date.now() + duracionMaximaMs);
+
+    document.getElementById('fecha-inicio').min = paraInputFecha(inicioMinimo);
+    document.getElementById('fecha-fin').max = paraInputFecha(finMaximo);
 }
 
-// Los limites (365 dias, tolerancia de inicio) los define el back y los expone en
-// /config/auctions. Aca solo guian al selector de fechas; el back valida igual al enviar.
-async function configurarLimitesDeFecha() {
-    try {
-        const cfg = await api.get('/config/auctions');
-        const toleranciaMs = cfg.toleranciaInicioMinutos * 60 * 1000;
-        const duracionMs = cfg.duracionMaximaDias * 24 * 60 * 60 * 1000;
-        document.getElementById('fecha-inicio').min = paraInputFecha(new Date(Date.now() - toleranciaMs));
-        document.getElementById('fecha-fin').max = paraInputFecha(new Date(Date.now() + duracionMs));
-    } catch {
-        // Si no llega la config, el back valida igual al enviar.
-    }
-}
-
+// datetime-local espera "YYYY-MM-DDTHH:mm" en hora local, sin zona.
 function paraInputFecha(fecha) {
     const dos = n => String(n).padStart(2, '0');
     return `${fecha.getFullYear()}-${dos(fecha.getMonth() + 1)}-${dos(fecha.getDate())}` +
         `T${dos(fecha.getHours())}:${dos(fecha.getMinutes())}`;
+}
+
+async function cargarCategorias() {
+    const select = document.getElementById('categoria');
+    try {
+        const categorias = await api.get('/categories');
+        categorias.forEach(categoria => {
+            const opcion = document.createElement('option');
+            opcion.value = categoria.id;
+            opcion.textContent = categoria.nombre;
+            select.appendChild(opcion);
+        });
+    } catch (error) {
+        mostrarAlerta('alerta-publicar', 'No se pudieron cargar las categorías. Recargá la página.', 'danger');
+    }
 }
 
 function configurarVistaPrevia() {
@@ -58,6 +80,37 @@ function valor(id) {
     return document.getElementById(id).value;
 }
 
+function marcar(id, mensaje) {
+    const campo = document.getElementById(id);
+    campo.setCustomValidity(mensaje);
+    if (mensaje) {
+        document.getElementById(`error-${id}`).textContent = mensaje;
+    }
+}
+
+function validarCoherencia() {
+    const precio = Number(valor('precio-base'));
+    const incremento = Number(valor('incremento'));
+    const inicio = new Date(valor('fecha-inicio'));
+    const fin = new Date(valor('fecha-fin'));
+
+    marcar('incremento', incremento > precio
+        ? 'El incremento no puede superar al precio base.' : '');
+
+    const inicioMinimo = toleranciaInicioMs === null ? null : new Date(Date.now() - toleranciaInicioMs);
+    marcar('fecha-inicio', inicioMinimo && inicio < inicioMinimo
+        ? 'La fecha de inicio no puede estar en el pasado.' : '');
+
+    const finMaximo = duracionMaximaMs === null ? null : new Date(Date.now() + duracionMaximaMs);
+    marcar('fecha-fin', fin <= inicio
+        ? 'La fecha de fin tiene que ser posterior a la de inicio.'
+        : fin <= new Date() ? 'La fecha de fin tiene que ser futura.'
+        : finMaximo && fin > finMaximo
+            ? `La fecha de fin no puede superar el ${finMaximo.toLocaleDateString('es-AR')}.`
+            : '');
+}
+
+// Las claves del 400 son los nombres de las propiedades del DTO de C#.
 const CAMPOS = {
     Titulo: 'titulo', Descripcion: 'descripcion', UrlImagen: 'url-imagen',
     CategoriaId: 'categoria', PrecioBase: 'precio-base',
@@ -71,6 +124,9 @@ function limpiarErrores(formulario) {
     });
 }
 
+// setCustomValidity es necesario ademas de la clase: el formulario ya tiene
+// was-validated, y sin invalidar la validez nativa Bootstrap lo sigue pintando de
+// verde (el campo cumple sus reglas de HTML5, aunque el servidor lo haya rechazado).
 function marcarCampoConError(idCampo, mensaje) {
     const campo = document.getElementById(idCampo);
     campo.setCustomValidity(mensaje);
@@ -90,6 +146,27 @@ function mostrarErroresDeCampo(erroresPorCampo) {
     });
 }
 
+// El 422 es una regla de negocio, no un error de formato: el servidor solo manda un
+// mensaje de texto, sin nombre de campo. Como ServicioDeSubastas.PublicarAsync solo
+// puede rechazar por estos cuatro motivos fijos, alcanza con reconocer el mensaje para
+// mostrarlo bajo el campo correcto en vez de un alert() generico.
+const MENSAJES_DE_NEGOCIO_A_CAMPO = [
+    [/no existe una categoría/i, 'categoria'],
+    [/incremento mínimo no puede superar/i, 'incremento'],
+    [/fecha de inicio no puede estar en el pasado/i, 'fecha-inicio'],
+    [/fecha de fin debe ser posterior/i, 'fecha-fin'],
+    [/subasta no puede terminar más allá/i, 'fecha-fin']
+];
+
+function mostrarErrorDeNegocio(mensaje) {
+    const coincidencia = MENSAJES_DE_NEGOCIO_A_CAMPO.find(([patron]) => patron.test(mensaje));
+    if (coincidencia) {
+        marcarCampoConError(coincidencia[1], mensaje);
+    } else {
+        mostrarAlerta('alerta-publicar', mensaje, 'danger');
+    }
+}
+
 function configurarEnvio() {
     const formulario = document.getElementById('formulario-publicar');
 
@@ -97,9 +174,13 @@ function configurarEnvio() {
         evento.preventDefault();
         ocultarAlerta('alerta-publicar');
         limpiarErrores(formulario);
+        validarCoherencia();
 
         formulario.classList.add('was-validated');
         if (!formulario.checkValidity()) {
+            // Sin esto el envio se corta en silencio: el aviso rojo queda arriba de
+            // todo y el boton al final de un formulario largo, como si la pagina se
+            // hubiera colgado.
             formulario.querySelector(':invalid')?.focus();
             return;
         }
@@ -121,9 +202,10 @@ function configurarEnvio() {
             const creada = await api.post('/auctions', datos);
             window.location.href = `subasta.html?id=${creada.id}`;
         } catch (error) {
-            // Las reglas de negocio las valida el back; el front solo muestra lo que devuelve.
             if (error.status === 400 && error.erroresPorCampo) {
                 mostrarErroresDeCampo(error.erroresPorCampo);
+            } else if (error.status === 422) {
+                mostrarErrorDeNegocio(error.message);
             } else {
                 mostrarAlerta('alerta-publicar', error.message, 'danger');
             }

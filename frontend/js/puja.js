@@ -1,13 +1,24 @@
+// Formulario de oferta del detalle de la subasta.
+//
+// Todo vive dentro de esta funcion: los scripts de la pantalla comparten el ambito
+// global y sala.js ya usa nombres como subastaId, conexion o recargarEstado. Declarar
+// cualquiera de ellos otra vez rompe la pagina entera, no solo el formulario.
 (() => {
     'use strict';
 
     let detalle = null;
     let montoMinimo = 0;
     let situacionDibujada = null;
+    // El usuario escribio en el campo: desde ese momento su monto no se pisa solo.
     let montoTocado = false;
+    // Su oferta acaba de entrar: lo unico que cambia es el texto de la confirmacion.
     let recienOferto = false;
+    // Estado con el que se dibujo la vez anterior, para detectar el arranque en vivo.
     let estadoAnterior = null;
 
+    // El detalle se redibuja cada vez que llega una oferta, se reconecta la sala o el
+    // sistema cierra la subasta. Por eso aca no se dibuja de nuevo si la situacion no
+    // cambio: redibujar borraria lo que el usuario esta escribiendo y le sacaria el foco.
     document.addEventListener('subasta:cargada', evento => {
         const arranco = estadoAnterior === 'Programada' && evento.detail.estado === 'Activa';
         estadoAnterior = evento.detail.estado;
@@ -16,9 +27,14 @@
         montoMinimo = detalle.montoMinimo;
         dibujar();
 
+        // La subasta arranco mientras la pantalla estaba abierta: el estado ya se
+        // redibujo solo, pero el cambio es facil de no ver si el usuario esta mirando
+        // otra parte de la pagina.
         if (arranco) avisarInicio(situacionDibujada);
     });
 
+    // Aviso de sala.js cuando entra una oferta nueva sin recargar el detalle: alcanza
+    // con corregir el minimo y, si cambio quien lidera, la situacion.
     document.addEventListener('sala:actualizada', evento => {
         if (!detalle) return;
         detalle = { ...detalle, ...evento.detail };
@@ -26,8 +42,11 @@
         dibujar();
     });
 
+    // Entre que vence la fecha de fin y el proceso que cierra las subastas la procesa, la
+    // API la sigue informando como Activa. Ofertar ahi devuelve 422: mejor no ofrecerlo.
+    // Mismo criterio que subasta.js y catalogo.js.
     function puedeRecibirOfertas() {
-        return detalle.estado === 'Activa';
+        return detalle.estado === 'Activa' && new Date(detalle.fechaFin) > ahoraServidor();
     }
 
     function situacionActual() {
@@ -88,6 +107,9 @@
 
         const enlace = document.createElement('a');
         enlace.className = 'btn btn-primary';
+        // Vuelve a esta subasta despues de ingresar, en vez de dejarlo en el catalogo.
+        // El nombre del parametro y el formato sin ruta son los que espera login.js:
+        // valida el destino contra "archivo.html" para no redirigir a cualquier lado.
         enlace.href = `login.html?volverA=${encodeURIComponent('subasta.html' + location.search)}`;
         enlace.textContent = 'Ingresar para ofertar';
 
@@ -116,6 +138,8 @@
         campo.id = 'monto-puja';
         campo.step = '0.01';
         campo.min = String(montoMinimo);
+        // Arranca con el minimo ya escrito: es un clic en vez de averiguar el numero, y
+        // hace que reintentar despues de un conflicto sea inmediato.
         campo.value = String(montoMinimo);
         campo.addEventListener('input', () => { montoTocado = true; });
         limitarADosDecimales(campo);
@@ -143,6 +167,7 @@
         error.id = 'error-puja';
         error.hidden = true;
 
+        // Contenedor del dialogo de conflicto: vacio hasta que la API devuelve un 409.
         const conflicto = document.createElement('div');
         conflicto.id = 'conflicto-puja';
 
@@ -158,6 +183,9 @@
         return bloque;
     }
 
+    // El minimo sube con cada oferta ajena. El monto del usuario no se pisa si ya lo
+    // toco: se le avisa que el minimo subio y decide el. Pisarlo mientras escribe seria
+    // cambiarle el numero por atras justo antes de que apriete el boton.
     function actualizarMinimo() {
         const campo = document.getElementById('monto-puja');
         const ayuda = document.getElementById('ayuda-puja');
@@ -166,9 +194,18 @@
         campo.min = String(montoMinimo);
         ayuda.textContent = `Mínimo: ${formatearPesos(montoMinimo)}`;
 
-        if (!montoTocado) campo.value = String(montoMinimo);
+        if (!montoTocado) {
+            campo.value = String(montoMinimo);
+            return;
+        }
+
+        if (Number(campo.value) < montoMinimo) {
+            mostrarError(`Otra oferta subió el mínimo a ${formatearPesos(montoMinimo)}.`);
+        }
     }
 
+    // mostrarAvisoFlotante vive en ui.js: la comparte con el aviso de extension de
+    // tiempo de sala.js, asi los dos se ven como parte del mismo sistema.
     function avisarInicio(situacion) {
         const textos = {
             puede: 'La subasta comenzó: ya podés ofertar.',
@@ -212,37 +249,60 @@
             mostrarError('Escribí cuánto querés ofertar.');
             return;
         }
+        // Comodidad, no defensa: quien decide de verdad es el servidor, que valida el
+        // monto contra la puja actual en el mismo instante en que la registra.
+        if (monto < montoMinimo) {
+            mostrarError(`La oferta debe ser de al menos ${formatearPesos(montoMinimo)}.`);
+            return;
+        }
 
         alternarCargando('boton-ofertar', 'spinner-ofertar', true);
 
+        // Se marca antes de mandar, no despues: la oferta propia puede volver por el
+        // canal en vivo antes que la respuesta del POST, y en ese caso la pantalla ya se
+        // redibujo sin la confirmacion.
         recienOferto = true;
 
         try {
             const puja = await api.post(`/auctions/${detalle.id}/bids`, { monto });
 
+            // La sala es el unico punto por donde entra una oferta nueva, venga del canal
+            // en vivo o de esta respuesta. Asi la pantalla se actualiza sin esperar el
+            // aviso, y sin contar dos veces la misma oferta.
             registrarPujaEnSala(puja);
             avisarOfertaRegistrada(puja);
             montoTocado = false;
         } catch (error) {
+            // La oferta no entro: si mas adelante aparece como lider por otra via, no
+            // corresponde mostrarle la confirmacion de esta.
             recienOferto = false;
             manejarError(error);
         } finally {
+            // En el finally y no al final del try: si el boton queda deshabilitado
+            // despues de un error, el usuario no puede volver a ofertar en toda la
+            // subasta y la unica salida es recargar.
             alternarCargando('boton-ofertar', 'spinner-ofertar', false);
         }
     }
 
     function manejarError(error) {
+        // 409: no es un error del usuario. Otra oferta entro mientras preparaba la suya,
+        // asi que en vez de un cartel rojo se le ofrece el reintento con el monto nuevo.
         if (error.status === 409 && error.cuerpo && error.cuerpo.montoMinimo) {
             mostrarConflicto(error.cuerpo);
             return;
         }
 
+        // 400: el cuerpo trae los errores por campo del DTO (monto con mas de dos
+        // decimales, fuera de rango). El unico campo del formulario es el monto.
         if (error.status === 400 && error.erroresPorCampo) {
             const mensajes = Object.values(error.erroresPorCampo)[0];
             mostrarError(Array.isArray(mensajes) ? mensajes[0] : String(mensajes));
             return;
         }
 
+        // 403 (vendedor), 422 (saldo, monto, subasta vencida) y 404: el servidor ya manda
+        // el mensaje que corresponde mostrar, no hace falta reescribirlo.
         mostrarError(error.message);
     }
 
@@ -275,6 +335,7 @@
         bloque.append(texto, reintentar, cancelar);
         contenedor.replaceChildren(bloque);
 
+        // El campo queda con el monto nuevo para quien prefiera escribir otro numero.
         const campo = document.getElementById('monto-puja');
         if (campo) {
             campo.min = String(conflicto.montoMinimo);

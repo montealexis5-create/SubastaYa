@@ -1,3 +1,5 @@
+// Sala en vivo: historial de ofertas y actualizacion de la pantalla sin recargar.
+
 let subastaId = null;
 let conexion = null;
 let cerradaPorFin = false;
@@ -11,14 +13,16 @@ document.addEventListener('subasta:cargada', async evento => {
     const primeraVez = subastaId === null;
     subastaId = detalle.id;
     cantidadOfertas = detalle.cantidadOfertas;
-    montoMostrado = detalle.pujaActual;
     liderActual = detalle.seudonimoLider;
+    montoMostrado = detalle.pujaActual;
 
     await cargarHistorial();
 
+    // Una subasta cerrada ya no recibe ofertas: no hace falta conexion en vivo.
     const abierta = detalle.estado === 'Activa' || detalle.estado === 'Programada';
     if (primeraVez && abierta) conectar();
     if (!abierta && conexion) {
+        // Se corta a proposito: la subasta termino. No es una falla de conexion.
         cerradaPorFin = true;
         conexion.stop();
     }
@@ -36,7 +40,10 @@ async function conectar() {
 
     conexion.onreconnecting(() => mostrarConexion('reconectando'));
     conexion.onreconnected(async () => {
+        // El grupo esta atado a la conexion, y una reconexion es una conexion nueva:
+        // sin volver a unirse, la sala queda conectada pero no recibe nada mas.
         await conexion.invoke('UnirseASubasta', subastaId);
+        // SignalR no reenvia lo que se perdio mientras estuvo caida.
         await recargarEstado();
         mostrarConexion('conectado');
     });
@@ -102,18 +109,24 @@ function crearFilaVacia(texto = 'Todavía no hay ofertas.') {
     return fila;
 }
 
+// Punto unico por donde entra una oferta nueva, venga del canal en vivo o de la
+// respuesta al propio POST. Quien oferta recibe las dos: el id evita contarla dos veces.
 function registrarPujaEnSala(puja) {
     if (idsEnHistorial.has(puja.id)) return;
 
+    // Una oferta que llega despues de otra mas alta (por ejemplo, la respuesta al propio
+    // POST cuando el aviso de otra oferta ya llego) no puede pisar lo que se ve: se
+    // vuelve a pedir el estado completo, que ya la incluye en su lugar.
     if (puja.monto <= montoMostrado) {
         recargarEstado();
         return;
     }
 
     idsEnHistorial.add(puja.id);
+    // El back manda el conteo: no se suma en el navegador.
     cantidadOfertas = puja.cantidadOfertas;
-    montoMostrado = puja.monto;
     liderActual = puja.seudonimo;
+    montoMostrado = puja.monto;
 
     const lista = document.getElementById('historial-pujas');
     lista.querySelector('.js-sin-ofertas')?.remove();
@@ -122,8 +135,10 @@ function registrarPujaEnSala(puja) {
     document.getElementById('puja-actual').textContent = formatearPesos(puja.monto);
     document.getElementById('lider').textContent = puja.seudonimo;
     document.getElementById('oferta-minima').textContent = formatearPesos(puja.montoMinimo);
-    document.getElementById('ofertas').textContent = textoDeOfertas(cantidadOfertas);
+    document.getElementById('ofertas').textContent =
+        cantidadOfertas === 1 ? '1 oferta' : `${cantidadOfertas} ofertas`;
 
+    // contador.js lee data-fecha-fin en cada segundo: alcanza con cambiar el dato.
     const contador = document.querySelector('#tiempo [data-fecha-fin]');
     if (contador) contador.dataset.fechaFin = puja.fechaFin;
 
@@ -140,6 +155,8 @@ function registrarPujaEnSala(puja) {
     }));
 }
 
+// Solo para quien ya oferto en esta subasta: alguien que solo mira no va ganando ni
+// perdiendo. Se compara por seudonimo, que es unico y es lo que muestra el historial.
 function actualizarEstadoPostor() {
     const badge = document.getElementById('estado-postor');
     const usuario = obtenerUsuario();
@@ -155,6 +172,9 @@ function actualizarEstadoPostor() {
     badge.hidden = false;
 }
 
+// Mismo aviso flotante que usa puja.js para el arranque: con el nombre de la subasta y
+// la hora nueva, para que sirva igual a quien mira otra pestana o se distrajo un
+// segundo. Dura un poco mas que el de arranque porque cambia una fecha, no solo informa.
 function mostrarExtension(fechaFin) {
     const titulo = document.getElementById('titulo')?.textContent ?? 'La subasta';
     mostrarAvisoFlotante(
@@ -163,6 +183,9 @@ function mostrarExtension(fechaFin) {
     );
 }
 
+// Al reconectar o cuando el servidor avisa un cierre: se vuelve a pedir el detalle y
+// se redibuja. dibujarDetalle vuelve a disparar subasta:cargada, que recarga el
+// historial y le avisa a puja.js si la subasta ya no acepta ofertas.
 async function recargarEstado() {
     try {
         const detalle = await api.get(`/auctions/${subastaId}`);
