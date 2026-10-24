@@ -43,7 +43,7 @@ El middleware global de excepciones (misma tabla 404/422/403/409/500), el `Subas
 
 ## Verificado
 - `dotnet test`: 15 pruebas de dominio.
-- `scripts/verificar.ps1`: 36 chequeos contra la API levantada (codigos HTTP, reglas rechazadas con 422, concurrencia, saldos, contrato nuevo y que el frontend no tenga logica propia). Crea sus propios usuarios y subastas: conviene resetear la base antes de una demo.
+- `scripts/verificar.ps1`: 36 chequeos contra la API levantada (codigos HTTP, reglas rechazadas con 422, ofertas, saldos, contrato nuevo y que el frontend no tenga logica propia). Crea sus propios usuarios y subastas: conviene resetear la base antes de una demo.
 - `scripts/prueba-concurrencia.ps1`: una oferta aceptada y el resto rechazadas por ronda. Saldo total conciliado con el ledger y saldo retenido igual a las pujas lideres.
 
 ## Pruebas automaticas
