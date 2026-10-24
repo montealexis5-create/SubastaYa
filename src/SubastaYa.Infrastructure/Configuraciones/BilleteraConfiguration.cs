@@ -17,6 +17,8 @@ public class BilleteraConfiguration : IEntityTypeConfiguration<Billetera>
 		builder.Property(b => b.Version)
 			.IsConcurrencyToken();
 
+		builder.Ignore(b => b.SaldoDisponible);
+
 		builder.ToTable(t =>
 		{
 			t.HasCheckConstraint("CK_Billetera_SaldoTotalNoNegativo", "\"SaldoTotal\" >= 0");

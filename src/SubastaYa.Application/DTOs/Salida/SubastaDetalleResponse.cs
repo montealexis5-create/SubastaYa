@@ -1,3 +1,5 @@
+using SubastaYa.Domain.Entidades;
+
 namespace SubastaYa.Application.DTOs.Salida;
 
 public class SubastaDetalleResponse
@@ -19,5 +21,5 @@ public class SubastaDetalleResponse
 
 	public DateTime FechaServidor { get; set; }
 
-	public decimal MontoMinimo => PujaActual + IncrementoMinimo;
+	public decimal MontoMinimo => Subasta.CalcularMontoMinimo(PujaActual, IncrementoMinimo);
 }

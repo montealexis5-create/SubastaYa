@@ -12,15 +12,18 @@ public class ServicioDeUsuarios : IServicioDeUsuarios
 	private readonly IUsuarioRepository _usuarios;
 	private readonly IServicioDePasswords _passwords;
 	private readonly IUnitOfWork _unidad;
+	private readonly IReloj _reloj;
 
 	public ServicioDeUsuarios(
 		IUsuarioRepository usuarios,
 		IServicioDePasswords passwords,
-		IUnitOfWork unidad)
+		IUnitOfWork unidad,
+		IReloj reloj)
 	{
 		_usuarios = usuarios;
 		_passwords = passwords;
 		_unidad = unidad;
+		_reloj = reloj;
 	}
 
 	public async Task<UsuarioResponse> RegistrarAsync(RegistroRequest solicitud)
@@ -38,7 +41,7 @@ public class ServicioDeUsuarios : IServicioDeUsuarios
 			PasswordHash = _passwords.Hashear(solicitud.Password),
 			Nombre = solicitud.Nombre.Trim(),
 			Seudonimo = seudonimo,
-			FechaRegistro = DateTime.UtcNow,
+			FechaRegistro = _reloj.AhoraUtc,
 			Billetera = Billetera.Abrir()
 		};
 

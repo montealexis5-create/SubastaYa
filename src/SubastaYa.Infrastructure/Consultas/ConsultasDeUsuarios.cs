@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using SubastaYa.Application.Consultas;
 using SubastaYa.Application.DTOs.Salida;
+using SubastaYa.Application.Servicios;
 using SubastaYa.Domain.Enums;
 using SubastaYa.Domain.Excepciones;
 using SubastaYa.Infrastructure.Persistencia;
@@ -67,18 +68,8 @@ public class ConsultasDeUsuarios : IConsultasDeUsuarios
 				MiOfertaMaxima = s.MiOfertaMaxima,
 				PujaActual = s.PujaActual,
 				FechaFin = s.FechaFin,
-				Resultado = CalcularResultado(s.Estado, s.LiderId == usuarioId)
+				Resultado = ResultadosDeSubasta.ParaComprador(s.Estado, s.LiderId == usuarioId)
 			})
 			.ToList();
-	}
-
-	private static string CalcularResultado(EstadoSubasta estado, bool esLider)
-	{
-		if (estado == EstadoSubasta.Finalizada)
-		{
-			return esLider ? "Ganada" : "No ganada";
-		}
-
-		return esLider ? "Liderando" : "Superado";
 	}
 }

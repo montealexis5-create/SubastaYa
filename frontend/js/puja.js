@@ -166,14 +166,7 @@
         campo.min = String(montoMinimo);
         ayuda.textContent = `Mínimo: ${formatearPesos(montoMinimo)}`;
 
-        if (!montoTocado) {
-            campo.value = String(montoMinimo);
-            return;
-        }
-
-        if (Number(campo.value) < montoMinimo) {
-            mostrarError(`Otra oferta subió el mínimo a ${formatearPesos(montoMinimo)}.`);
-        }
+        if (!montoTocado) campo.value = String(montoMinimo);
     }
 
     function avisarInicio(situacion) {
@@ -217,10 +210,6 @@
         const monto = Number(valor);
         if (!valor || Number.isNaN(monto)) {
             mostrarError('Escribí cuánto querés ofertar.');
-            return;
-        }
-        if (monto < montoMinimo) {
-            mostrarError(`La oferta debe ser de al menos ${formatearPesos(montoMinimo)}.`);
             return;
         }
 

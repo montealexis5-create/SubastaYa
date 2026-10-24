@@ -1,7 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.Extensions.Options;
-using SubastaYa.Application.Configuracion;
 using SubastaYa.Application.DTOs.Salida;
+using SubastaYa.Application.Servicios;
 
 namespace SubastaYa.Api.Controllers;
 
@@ -9,19 +8,15 @@ namespace SubastaYa.Api.Controllers;
 [Route("api/v1/config")]
 public class ConfiguracionController : ControllerBase
 {
-	private readonly OpcionesPublicacion _publicacion;
+	private readonly IServicioDeConfiguracion _servicio;
 
-	public ConfiguracionController(IOptions<OpcionesPublicacion> publicacion)
+	public ConfiguracionController(IServicioDeConfiguracion servicio)
 	{
-		_publicacion = publicacion.Value;
+		_servicio = servicio;
 	}
 
 	[HttpGet("auctions")]
 	[ProducesResponseType(typeof(ConfiguracionPublicacionResponse), StatusCodes.Status200OK)]
 	public ActionResult<ConfiguracionPublicacionResponse> ObtenerDePublicacion()
-		=> Ok(new ConfiguracionPublicacionResponse
-		{
-			DuracionMaximaDias = _publicacion.DuracionMaximaDias,
-			ToleranciaInicioMinutos = _publicacion.ToleranciaInicioMinutos
-		});
+		=> Ok(_servicio.ObtenerDePublicacion());
 }

@@ -1,5 +1,6 @@
 using Microsoft.Extensions.Logging;
 using SubastaYa.Domain;
+using SubastaYa.Domain.Entidades;
 using SubastaYa.Domain.Persistencia;
 using SubastaYa.Domain.Repositorios;
 
@@ -35,7 +36,7 @@ public class ActivadorDeSubastas : IActivadorDeSubastas
 	/// Programada a Activa. Se audita igual que el cierre.
 	public async Task ActivarAsync(int subastaId, DateTime ahora, CancellationToken cancelacion)
 	{
-		var subasta = await _subastas.ObtenerProgramadaParaActivarAsync(subastaId, ahora, cancelacion);
+		var subasta = await _subastas.ObtenerAsync(subastaId, Subasta.ParaActivar(ahora), cancelacion);
 		if (subasta is null)
 		{
 			return;

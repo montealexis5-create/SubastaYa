@@ -20,18 +20,21 @@ public class ServicioDeSubastas : IServicioDeSubastas
 	private readonly ICategoriaRepository _categorias;
 	private readonly IConsultasDeSubastas _consultas;
 	private readonly IUnitOfWork _unidad;
+	private readonly IReloj _reloj;
 
 	public ServicioDeSubastas(
 		ISubastaRepository subastas,
 		ICategoriaRepository categorias,
 		IConsultasDeSubastas consultas,
 		IUnitOfWork unidad,
-		IOptions<OpcionesPublicacion> opciones)
+		IOptions<OpcionesPublicacion> opciones,
+		IReloj reloj)
 	{
 		_subastas = subastas;
 		_categorias = categorias;
 		_consultas = consultas;
 		_unidad = unidad;
+		_reloj = reloj;
 		_duracionMaxima = TimeSpan.FromDays(opciones.Value.DuracionMaximaDias);
 		_toleranciaInicioPasado = TimeSpan.FromMinutes(opciones.Value.ToleranciaInicioMinutos);
 	}
@@ -43,7 +46,7 @@ public class ServicioDeSubastas : IServicioDeSubastas
 			throw new ReglaDeNegocioException($"No existe una categoría con id {request.CategoriaId}.");
 		}
 
-		var ahora = DateTime.UtcNow;
+		var ahora = _reloj.AhoraUtc;
 		var fechaInicio = AUtc(request.FechaInicio!.Value);
 		var fechaFin = AUtc(request.FechaFin!.Value);
 
