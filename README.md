@@ -186,9 +186,12 @@ dominio; el repositorio solo ejecuta la consulta.
 
 **El servidor es la única fuente de verdad.** El monto mínimo, el estado, la cantidad de
 ofertas, la hora (`fechaServidor`) y los límites de publicación (`GET /config/auctions`)
-los calcula y los manda el back. El frontend los muestra y solo usa la hora del servidor
-para animar el contador. Para eso el negocio toma la hora de `IReloj`, una abstracción
-inyectable, y no de `DateTime.UtcNow` en cada servicio.
+los calcula y los manda el back. El frontend los usa pero no los calcula: descuenta el
+contador contra la hora del servidor y compara la oferta con el `montoMinimo` que recibe.
+En pantalla valida lo básico (fechas coherentes, montos positivos, oferta por debajo del
+mínimo) para no enviar peticiones inútiles, como pide el enunciado, pero quien garantiza
+cada regla es el back, que responde 422, 403 o 409. Para eso el negocio toma la hora de
+`IReloj`, una abstracción inyectable, y no de `DateTime.UtcNow` en cada servicio.
 
 ## API
 
@@ -387,7 +390,7 @@ proceso en segundo plano las cierra en cuanto arranca.
 | Qué | Cómo | Qué comprueba |
 |---|---|---|
 | Tests de dominio | `dotnet test` | Reglas de `Subasta` y `Billetera` sin base de datos: monto mínimo, anti-sniping, versiones, saldos |
-| Verificación de punta a punta | `powershell -ExecutionPolicy Bypass -File scripts/verificar.ps1` | Con la API y la base arriba: códigos HTTP, reglas rechazadas con 422, ofertas, saldos y que el frontend no tenga lógica propia |
+| Verificación de punta a punta | `powershell -ExecutionPolicy Bypass -File scripts/verificar.ps1` | Con la API y la base arriba: códigos HTTP, reglas rechazadas con 422, ofertas, saldos y el contrato de la API |
 | Integración continua | GitHub Actions (`ci.yml`) | `dotnet build` y `dotnet test` en cada push y pull request |
 
 `verificar.ps1` crea su propio usuario y su propia subasta, así que no depende del sembrado.
