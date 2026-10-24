@@ -1,3 +1,6 @@
+// Billetera: saldos, carga de saldo simulada e historial de movimientos.
+
+// Nombre que ve el usuario. El efecto sobre el saldo (suma, resta o reserva) lo manda el back.
 const NOMBRES_MOVIMIENTO = {
     Deposito:   'Depósito',
     Cobro:      'Cobro',
@@ -17,10 +20,13 @@ const MENSAJE_MONTO = 'Ingresá un monto mayor a cero, con hasta dos decimales.'
 let paginaMovimientos = 1;
 
 document.addEventListener('DOMContentLoaded', () => {
+    // requiereSesion ya redirigio al login: sin este corte, la pantalla llegaria a pedir
+    // los saldos sin token y mostraria un error antes de irse.
     if (!haySesion()) return;
 
     const campoMonto = document.getElementById('monto-deposito');
     limitarADosDecimales(campoMonto);
+    // Un error que marco el servidor deja de valer apenas el usuario corrige el campo.
     campoMonto.addEventListener('input', () => {
         campoMonto.setCustomValidity('');
         document.getElementById('error-monto-deposito').textContent = MENSAJE_MONTO;
@@ -32,19 +38,18 @@ document.addEventListener('DOMContentLoaded', () => {
     cargarBilletera();
 });
 
-const SECCIONES = {
-    cargando: 'cargando-billetera',
-    exito: 'contenido-billetera'
-};
-
 function mostrarEstado(estado) {
-    mostrarSecciones(SECCIONES, estado, 'alerta-billetera');
+    document.getElementById('cargando-billetera').hidden  = estado !== 'cargando';
+    document.getElementById('contenido-billetera').hidden = estado !== 'exito';
+    if (estado !== 'error') ocultarAlerta('alerta-billetera');
 }
 
 async function cargarBilletera() {
     mostrarEstado('cargando');
 
     try {
+        // En paralelo: son independientes, y esperar una para pedir la otra solo
+        // alargaria la carga.
         const [saldos, movimientos] = await Promise.all([
             api.get('/wallets/me'),
             api.get(`/wallets/me/entries?pagina=1&tamano=${TAMANO_PAGINA}`)
@@ -66,6 +71,8 @@ function dibujarSaldos({ saldoTotal, saldoRetenido, saldoDisponible }) {
     document.getElementById('saldo-disponible').textContent = formatearPesos(saldoDisponible);
 }
 
+// agregar = true suma la pagina nueva debajo de las anteriores ("Ver mas"); false
+// reemplaza la tabla, que es lo que se quiere al cargar o despues de un deposito.
 function dibujarMovimientos(pagina, agregar) {
     const cuerpo = document.getElementById('cuerpo-movimientos');
     if (!agregar) cuerpo.replaceChildren();
@@ -89,6 +96,8 @@ function crearFila(movimiento) {
     const nombreTipo = document.createElement('td');
     nombreTipo.textContent = NOMBRES_MOVIMIENTO[movimiento.tipo] ?? movimiento.tipo;
 
+    // Detalle: la descripcion y, si el movimiento vino de una subasta, un enlace a ella.
+    // Todo con textContent: el titulo de la subasta lo escribio otro usuario.
     const detalle = document.createElement('td');
     detalle.textContent = movimiento.descripcion ?? '';
     if (movimiento.subastaId) {
@@ -130,6 +139,8 @@ async function depositar(evento) {
 
     ocultarAlerta('alerta-deposito');
 
+    // Validacion del navegador antes de gastar una llamada. La que manda sigue siendo la
+    // del backend: esta se puede saltear desde la consola.
     if (!formulario.checkValidity()) {
         formulario.classList.add('was-validated');
         return;
@@ -140,6 +151,7 @@ async function depositar(evento) {
     try {
         const saldos = await api.post('/wallets/me/deposits', { monto: Number(campo.value) });
 
+        // La respuesta ya trae los saldos nuevos: se muestran sin pedirlos otra vez.
         dibujarSaldos(saldos);
         formulario.reset();
         formulario.classList.remove('was-validated');
@@ -147,6 +159,7 @@ async function depositar(evento) {
     } catch (error) {
         const errorDelCampo = error.erroresPorCampo?.Monto?.[0];
         if (errorDelCampo) {
+            // Error de formato: se marca el campo con el mensaje del servidor.
             document.getElementById('error-monto-deposito').textContent = errorDelCampo;
             campo.setCustomValidity(errorDelCampo);
             formulario.classList.add('was-validated');
@@ -161,9 +174,12 @@ async function depositar(evento) {
     await refrescarMovimientos();
 }
 
+// Aparte del deposito: si esta consulta falla, el deposito igual se hizo, y el aviso
+// tiene que decir eso y no que la carga de saldo fallo.
 async function refrescarMovimientos() {
     try {
         const pagina = await api.get(`/wallets/me/entries?pagina=1&tamano=${TAMANO_PAGINA}`);
+        // El movimiento nuevo va primero: se vuelve a la primera pagina.
         paginaMovimientos = 1;
         dibujarMovimientos(pagina, false);
     } catch {

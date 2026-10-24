@@ -34,7 +34,7 @@ public class UnitOfWork : IUnitOfWork
 		{
 			throw new SaldoRetenidoNegativoException(ex);
 		}
-		catch (DbUpdateException ex) when (ex.EsViolacionDeUnicidad())
+		catch (DbUpdateException ex) when (ex.EsViolacionDeUsuarioDuplicado())
 		{
 			throw new RecursoDuplicadoException("Ya existe una cuenta con ese email o seudónimo.");
 		}

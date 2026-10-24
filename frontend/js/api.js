@@ -1,6 +1,13 @@
+// Centraliza todas las llamadas HTTP a la API: el token y los headers viven
+// unicamente en este archivo.
+
 const CLAVE_TOKEN = 'subastaya.token';
 const CLAVE_USUARIO = 'subastaya.usuario';
 
+// La sesion vive en localStorage y no en sessionStorage: asi abrir una subasta en una
+// pestana nueva no obliga a iniciar sesion de nuevo. No es un riesgo distinto al de
+// antes: el token sigue venciendo solo, y el 401 de aca abajo borra la sesion y manda
+// al login igual que si hubiera vencido en la pestana original.
 function obtenerToken() {
     return localStorage.getItem(CLAVE_TOKEN);
 }
@@ -11,6 +18,8 @@ function obtenerUsuario() {
     try {
         return JSON.parse(crudo);
     } catch {
+        // Un valor corrupto haria fallar cualquier pantalla que lea el usuario.
+        // Se descarta la sesion en vez de dejar la aplicacion rota.
         borrarSesion();
         return null;
     }
@@ -26,6 +35,8 @@ function borrarSesion() {
     localStorage.removeItem(CLAVE_USUARIO);
 }
 
+// Error con el codigo HTTP y el cuerpo, para que cada pantalla decida que hacer
+// segun el status en vez de leer el texto del mensaje.
 class ErrorApi extends Error {
     constructor(status, mensaje, cuerpo) {
         super(mensaje);
@@ -34,6 +45,8 @@ class ErrorApi extends Error {
         this.cuerpo = cuerpo;
     }
 
+    // Errores de formato: los devuelve ASP.NET como ProblemDetails, con un arreglo
+    // de mensajes por cada campo invalido. Permite senalar el campo en el formulario.
     get erroresPorCampo() {
         return this.cuerpo && this.cuerpo.errors ? this.cuerpo.errors : null;
     }
@@ -42,6 +55,8 @@ class ErrorApi extends Error {
 async function llamarApi(ruta, opciones = {}) {
     const headers = { ...(opciones.headers || {}) };
 
+    // Sin cuerpo no hay nada que describir, y un Content-Type en un GET hace que
+    // algunos navegadores disparen una peticion preflight innecesaria.
     if (opciones.body !== undefined) {
         headers['Content-Type'] = 'application/json';
     }
@@ -55,10 +70,19 @@ async function llamarApi(ruta, opciones = {}) {
     try {
         respuesta = await fetch(`${API_BASE}${ruta}`, { ...opciones, headers });
     } catch {
+        // fetch solo rechaza cuando la peticion no llega a destino: API apagada,
+        // sin red o bloqueo de CORS. No hay status porque no hubo respuesta.
         throw new ErrorApi(0, 'No se pudo conectar con el servidor.', null);
     }
 
+    // fetch NO lanza ante un 4xx ni un 5xx: hay que mirar el status a mano. Es el
+    // error mas comun al usar fetch y aca importa, porque el manejo del 409 depende
+    // de que estas respuestas lleguen al catch de la pantalla.
     if (!respuesta.ok) {
+        // Un 401 teniendo token guardado significa que el token vencio o dejo de ser
+        // valido. Se resuelve aca, que es el unico punto por donde pasan todas las
+        // respuestas: si cada pantalla tuviera que acordarse de mirarlo, la primera que
+        // se olvide deja al usuario con errores que no puede entender ni resolver.
         if (respuesta.status === 401 && obtenerToken()) {
             borrarSesion();
             window.location.replace('login.html?vencida=1');
@@ -68,6 +92,8 @@ async function llamarApi(ruta, opciones = {}) {
         throw new ErrorApi(respuesta.status, mensajeDeError(respuesta.status, cuerpo), cuerpo);
     }
 
+    // 201 Created y 204 No Content pueden venir sin cuerpo: pedirles .json()
+    // lanzaria un error de parseo sobre una respuesta exitosa.
     return leerCuerpo(respuesta);
 }
 
@@ -82,6 +108,8 @@ async function leerCuerpo(respuesta) {
 }
 
 function mensajeDeError(status, cuerpo) {
+    // Los errores de negocio traen { mensaje }. Se prefiere ese texto: ya viene
+    // redactado para el usuario desde el servicio que lo lanzo.
     if (cuerpo && cuerpo.mensaje) return cuerpo.mensaje;
 
     if (cuerpo && cuerpo.errors) {
@@ -96,6 +124,8 @@ function mensajeDeError(status, cuerpo) {
     return 'Ocurrió un error inesperado.';
 }
 
+// La API expone solo lecturas y altas: no hay ningun endpoint PUT ni DELETE, asi que
+// tampoco se agregan helpers para verbos que nadie usa.
 const api = {
     get: (ruta) => llamarApi(ruta),
     post: (ruta, cuerpo) => llamarApi(ruta, { method: 'POST', body: JSON.stringify(cuerpo) })

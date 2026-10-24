@@ -12,7 +12,7 @@ Para empezar de cero: `dotnet ef database drop -f`, `dotnet ef database update` 
 - [ ] Pujar con comprador1 arriba de comprador2. A comprador2 le llega el aviso de superado y se le libera lo retenido.
 - [ ] Con dos navegadores en la misma subasta, una puja en uno actualiza precio, cantidad de ofertas y lider en el otro sin recargar.
 - [ ] Pujar con sinfondos: aparece el aviso de saldo insuficiente.
-- [ ] Pujar menos que el minimo: el formulario no valida el monto, muestra el mensaje que manda la API.
+- [ ] Pujar menos que el minimo: el formulario avisa antes de enviar. Si otra oferta sube el minimo mientras se escribe, aparece el aviso.
 - [ ] El vendedor en su propia subasta: la API lo rechaza y se muestra el mensaje.
 - [ ] Publicar una subasta de 3 minutos. En el ultimo minuto el reloj se pone rojo, una puja extiende 2 minutos y sale el aviso.
 - [ ] La subasta Programada no acepta pujas hasta que el worker la active.
@@ -22,5 +22,7 @@ Para empezar de cero: `dotnet ef database drop -f`, `dotnet ef database update` 
 - [ ] Una subasta vencida sin pujas queda desierta.
 
 ## Otras pantallas
+- [ ] Publicar con fechas incoherentes (fin antes de inicio, incremento mayor al precio): el aviso sale junto al campo. Si el back rechaza con 422, tambien sale junto al campo.
+- [ ] En los primeros 10 s despues de vencer (con el Album), el catalogo y el detalle muestran "Finalizando…" y el detalle no ofrece el formulario.
 - [ ] Depositar en la billetera; revisar el historial de movimientos y la paginacion.
 - [ ] Mis Actividades: mis pujas y mis subastas.

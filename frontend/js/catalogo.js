@@ -1,3 +1,5 @@
+// Catalogo de subastas: grilla, filtros y paginacion.
+
 const filtros = {
     busqueda: '', estado: '', categoriaId: '', precioMin: '', precioMax: '',
     orden: '', pagina: 1, tamano: 9
@@ -9,14 +11,12 @@ document.addEventListener('DOMContentLoaded', () => {
     cargarCatalogo();
 });
 
-const SECCIONES = {
-    cargando: 'cargando-catalogo',
-    exito: ['grilla-catalogo', 'paginacion-catalogo'],
-    vacio: 'vacio-catalogo'
-};
-
 function mostrarEstado(estado) {
-    mostrarSecciones(SECCIONES, estado, 'alerta-catalogo');
+    document.getElementById('cargando-catalogo').hidden   = estado !== 'cargando';
+    document.getElementById('grilla-catalogo').hidden     = estado !== 'exito';
+    document.getElementById('vacio-catalogo').hidden      = estado !== 'vacio';
+    document.getElementById('paginacion-catalogo').hidden = estado !== 'exito';
+    if (estado !== 'error') ocultarAlerta('alerta-catalogo');
 
     if (estado === 'vacio') {
         const hayFiltros = ['busqueda','estado','categoriaId','precioMin','precioMax']
@@ -39,7 +39,7 @@ async function cargarCatalogo() {
             return;
         }
 
-        sincronizarReloj(datos.items[0]?.fechaServidor);
+        sincronizarReloj(datos.items[0].fechaServidor);
         dibujarGrilla(datos.items);
         mostrarEstado('exito');
         dibujarPaginacion(datos);
@@ -71,7 +71,9 @@ function crearTarjeta(subasta) {
 
     columna.querySelector('.js-titulo').textContent    = subasta.titulo;
     columna.querySelector('.js-categoria').textContent = subasta.nombreCategoria;
-    columna.querySelector('.js-ofertas').textContent = textoDeOfertas(subasta.cantidadOfertas);
+    const cantidadOfertas = subasta.cantidadOfertas;
+    columna.querySelector('.js-ofertas').textContent =
+        cantidadOfertas === 1 ? '1 oferta' : cantidadOfertas === 0 ? 'Sin ofertas' : `${cantidadOfertas} ofertas`;
     columna.querySelector('.js-puja').textContent      = formatearPesos(subasta.pujaActual);
 
     const fotoFondo = columna.querySelector('.foto-subasta__fondo');
@@ -92,9 +94,20 @@ function crearTarjeta(subasta) {
     return columna;
 }
 
+// Mismo criterio que subasta.js: si el backend dice "Activa" mostramos contador; si
+// dice "Programada" mostramos fecha de inicio en vez de contador; y si ya venció pero
+// el backend todavía no la cerró (el proceso que cierra subastas vencidas corre por
+// separado), lo marcamos como "Finalizando..." en vez de decir "Finalizada" sobre una
+// subasta que el backend sigue reportando como activa.
 function dibujarTiempoTarjeta(elemento, subasta) {
     if (subasta.estado === 'Programada') {
         elemento.textContent = `Próxima · ${formatearFecha(subasta.fechaInicio)}`;
+        return;
+    }
+
+    const yaVencida = subasta.estado === 'Activa' && new Date(subasta.fechaFin) <= ahoraServidor();
+    if (yaVencida) {
+        elemento.textContent = 'Finalizando…';
         return;
     }
 
@@ -106,9 +119,12 @@ function dibujarTiempoTarjeta(elemento, subasta) {
         return;
     }
 
+    // Finalizada / Desierta ya confirmadas por el Worker
     elemento.textContent = subasta.estado === 'Finalizada' ? 'Finalizada' : 'Desierta';
 }
 
+// Los parametros vacios no se mandan: enviar "precioMin=" sin valor puede interpretarse
+// distinto a no mandarlo.
 function armarQuery() {
     const parametros = new URLSearchParams();
     Object.entries(filtros).forEach(([clave, valor]) => {
@@ -169,15 +185,26 @@ function conectarFiltros() {
 }
 
 function aplicarFiltros() {
+    // Cualquier cambio de filtro vuelve a la pagina 1. Sin esto, alguien parado en la
+    // pagina 3 que filtra por una categoria con dos resultados ve el estado vacio sobre
+    // un filtro que si tiene resultados. Es el bug mas comun de esta pantalla.
     filtros.pagina = 1;
     cargarCatalogo();
 }
 
 async function cargarCategorias() {
     try {
-        await poblarCategorias(document.getElementById('filtro-categoria'));
+        const categorias = await api.get('/categories');
+        const select = document.getElementById('filtro-categoria');
+
+        categorias.forEach(categoria => {
+            const opcion = document.createElement('option');
+            opcion.value = categoria.id;
+            opcion.textContent = categoria.nombre;
+            select.appendChild(opcion);
+        });
     } catch {
-        // Si falla, queda solo la opcion "Todas" y el catalogo se puede usar igual.
-        return;
+        // Que falle el desplegable no tiene que impedir ver el catalogo: se deja solo
+        // la opcion "Todas" y la pantalla sigue siendo usable.
     }
 }

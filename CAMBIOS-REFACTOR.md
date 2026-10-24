@@ -36,14 +36,14 @@ El middleware global de excepciones (misma tabla 404/422/403/409/500), el `Subas
 
 ## Otros cambios
 - Un repositorio por entidad y una unidad de trabajo que maneja la transaccion. Ahi se convierten los errores de concurrencia y de unicidad de EF/Npgsql en excepciones del dominio (terminan en 409); los servicios ya no los atrapan.
-- Cliente tonto: el frontend no calcula el minimo, no decide si una subasta vencio, no suma ofertas ni valida limites de publicacion. Usa lo que manda el back (`montoMinimo`, `fechaServidor`, `cantidadOfertas`, `/config/auctions`) y muestra el 422 o 409 de la API.
+- El back es la unica autoridad y el front no repite sus reglas: usa lo que manda (`montoMinimo`, `fechaServidor`, `cantidadOfertas`, `efecto`, `/config/auctions`) en vez de calcularlo. Se conservan las validaciones en pantalla del original (fechas e incremento coherentes, oferta por debajo del minimo, 422 junto al campo, "Finalizando…" cuando vence y el worker aun no cerro); lo unico que cambia es que los numeros ya no estan escritos en el navegador.
 - Auditoria segun la seccion 3.4 del enunciado: cambios de estado (activacion y cierre por el worker, cierre desierta), extensiones anti-sniping, rechazos de puja y acreditacion manual. La unica accion nueva respecto del original es ACTIVACION_WORKER (pasa de Programada a Activa).
 - Contrasenas de PostgreSQL y pgAdmin fuera del repo (`.env`), puertos publicados solo en 127.0.0.1, Swagger y datos de prueba solo en Development.
 - Limpieza de codigo muerto y estilo segun la guia "Buenas practicas Java y C#" de la catedra (por ejemplo, indentacion con tabs de 4 espacios).
 
 ## Verificado
 - `dotnet test`: 15 pruebas de dominio.
-- `scripts/verificar.ps1`: 36 chequeos contra la API levantada (codigos HTTP, reglas rechazadas con 422, ofertas, saldos, contrato nuevo y que el frontend no tenga logica propia). Crea sus propios usuarios y subastas: conviene resetear la base antes de una demo.
+- `scripts/verificar.ps1`: 30 chequeos contra la API levantada (codigos HTTP, reglas rechazadas con 422, ofertas, saldos y contrato nuevo). Crea sus propios usuarios y subastas: conviene resetear la base antes de una demo.
 - `scripts/prueba-concurrencia.ps1`: una oferta aceptada y el resto rechazadas por ronda. Saldo total conciliado con el ledger y saldo retenido igual a las pujas lideres.
 
 ## Pruebas automaticas

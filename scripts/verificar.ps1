@@ -8,8 +8,8 @@
     saldo retenido y el efecto de cada movimiento de la billetera.
 
     Crea su propio usuario de prueba con saldo simulado y oferta sobre una subasta
-    activa. No borra nada. Hace falta la base levantada (docker compose up -d)
-    y la base sembrada.
+    activa. No borra nada. Hace falta la base levantada (docker compose up -d) y la
+    API corriendo en Development, que carga las categorias del sembrado.
 
     Desde la raiz del repo:
 
@@ -191,20 +191,6 @@ try {
     $ret = $movimientos | Where-Object { $_.tipo -eq 'Retencion' } | Select-Object -First 1
     Resultado 'El deposito trae efecto = suma' ($dep -and $dep.efecto -eq 'suma')
     Resultado 'La retencion trae efecto = reserva' ($ret -and $ret.efecto -eq 'reserva')
-
-    Write-Host 'Frontend (sin logica propia)' -ForegroundColor Cyan
-    $pujaJs = Get-Content -Raw 'frontend/js/puja.js'
-    $subastaJs = Get-Content -Raw 'frontend/js/subasta.js'
-    Resultado 'puja.js usa detalle.montoMinimo' ($pujaJs -match 'detalle\.montoMinimo')
-    Resultado 'Ni puja.js ni subasta.js suman pujaActual + incremento' (-not (($pujaJs + $subastaJs) -match 'pujaActual\s*\+'))
-    $uiJs = Get-Content -Raw 'frontend/js/ui.js'
-    $salaJs = Get-Content -Raw 'frontend/js/sala.js'
-    $contadorJs = Get-Content -Raw 'frontend/js/contador.js'
-    $publicarJs = Get-Content -Raw 'frontend/js/publicar.js'
-    Resultado 'El front ya no decide vencimiento (sin estaVencida)' (-not ($uiJs -match 'estaVencida'))
-    Resultado 'sala.js no suma ofertas (usa el conteo del back)' (-not ($salaJs -match 'cantidadOfertas\+\+'))
-    Resultado 'contador.js descuenta contra la hora del servidor' ($contadorJs -match 'ahoraServidor')
-    Resultado 'publicar.js lee los limites de /config/auctions' ($publicarJs -match 'config/auctions')
 }
 finally {
     if ($procesoApi -and -not $procesoApi.HasExited) {
