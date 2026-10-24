@@ -79,12 +79,66 @@ Las escrituras pasan por repositorios de una sola entidad y una unidad de trabaj
 (`IUnitOfWork`) que maneja la transacción y traduce los errores de concurrencia de EF a
 excepciones del dominio. Las lecturas van por interfaces de consulta que devuelven DTOs y
 nunca modifican datos. Los controllers llaman a los servicios para escribir y a las
-consultas para leer.
+consultas para leer (ver *Lecturas y escrituras separadas* más abajo).
 
 `Domain` no conoce a nadie. Por eso las entidades no tienen atributos de Entity Framework
 ni de ASP.NET: se pueden usar sin arrastrar la base de datos ni el framework web, y un
 cambio en la capa de persistencia no obliga a tocar el dominio. SignalR queda detrás de
 `INotificadorDeSubastas`, así que los servicios avisan eventos sin conocer el hub.
+
+### Qué hace cada capa
+
+| Capa | Hace | No hace |
+|---|---|---|
+| Controllers y hub | Reciben la petición, validan el DTO, delegan y devuelven el código HTTP | Reglas de negocio, cálculos, consultas a la base |
+| Servicios (`Application`) | Reglas del sistema, validaciones, hora del servidor, transacciones | Conocer HTTP, rutas o códigos de estado |
+| Repositorios y consultas (`Infrastructure`) | Guardar y leer con EF Core | Decidir reglas: reciben el criterio y devuelven datos |
+| Dominio | Reglas propias de cada entidad (`MontoMinimo`, `RecibirOferta`, estados) | Depender de algo externo |
+
+### Qué pasa al ofertar
+
+`POST /auctions/{id}/bids` recorre las capas en este orden:
+
+1. `PujasController` toma el usuario del token y llama al servicio.
+2. `ValidadorDePujas` rechaza antes de tocar plata: 403 si es el vendedor; 422 si la
+   subasta no está activa o ya venció, si ya es el líder, si no llega al mínimo o si no
+   tiene saldo. Cada rechazo queda en auditoría.
+3. `RegistradorDePujas` abre una transacción: libera la retención del líder anterior,
+   retiene el saldo del nuevo, guarda la puja y llama a `Subasta.RecibirOferta`
+   (anti-sniping). Si otra oferta se adelantó, deshace todo y responde 409.
+4. `ServicioDePujas` arma la respuesta (mínimo nuevo, cantidad de ofertas, fecha de
+   cierre) y avisa a la sala por `INotificadorDeSubastas`.
+5. El controller devuelve 201.
+
+### Manejo global de errores
+
+Los servicios lanzan excepciones del dominio, sin saber de HTTP. Un único middleware
+(`ManejadorDeExcepcionesMiddleware`) las traduce, así los controllers no llevan `try-catch`:
+
+| Excepción | Código |
+|---|---|
+| `RecursoNoEncontradoException` | 404 |
+| `AccionProhibidaException` | 403 |
+| `ReglaDeNegocioException` | 422 |
+| `ConflictoDeConcurrenciaException`, `RecursoDuplicadoException` | 409 |
+| Cualquier otra | 500, con mensaje genérico |
+
+Además, 400 lo devuelve la validación de los DTOs (formato) y 401 la autenticación JWT.
+
+### Concurrencia optimista
+
+`Subasta` y `Billetera` llevan una columna `Version` que EF usa como token de
+concurrencia. Si dos ofertas leen la misma versión, la segunda falla al guardar,
+`UnitOfWork` lo traduce a una excepción del dominio y el registrador deshace la
+transacción. El cliente recibe un 409 con la oferta actual y el nuevo mínimo, no un 500.
+
+### Tiempo real con SignalR
+
+El hub vive en `/hubs/subastas` y solo administra grupos: el cliente llama a
+`UnirseASubasta(id)` y `SalirDeSubasta(id)`. Las ofertas no entran por el hub sino por la
+API REST; después de guardar, `NotificadorSignalR` difunde al grupo `subasta-{id}` los
+eventos `NuevaPuja`, `SubastaActivada` y `SubastaFinalizada`. Si el aviso falla, se
+registra una advertencia y la oferta ya guardada no se pierde.
 
 ## Decisiones de diseño
 
@@ -118,6 +172,24 @@ no hay stock ni un catálogo de productos por fuera de las subastas: un producto
 su subasta y no se vuelve a subastar por separado. Separarlo hubiera agregado una tabla
 y una relación sin resolver ningún requisito real.
 
+**Lecturas y escrituras separadas (CQRS liviano).** Las escrituras tienen reglas y
+transacciones, así que pasan por un servicio. Las lecturas no tienen nada que proteger,
+así que van por una interfaz de consulta de `Application` que devuelve DTOs. Pasar cada
+GET por un servicio solo agregaría métodos que reenvían la llamada sin aportar nada. La
+regla de dependencias se respeta igual: las interfaces viven en `Application` y la
+implementación en `Infrastructure`.
+
+**El repositorio no conoce reglas.** Para buscar las subastas a activar o a cerrar,
+`ISubastaRepository` recibe un criterio (`Subasta.ParaActivar(ahora)`,
+`Subasta.Vencida(ahora)`) que define el dominio. Qué significa "vencida" lo decide el
+dominio; el repositorio solo ejecuta la consulta.
+
+**El servidor es la única fuente de verdad.** El monto mínimo, el estado, la cantidad de
+ofertas, la hora (`fechaServidor`) y los límites de publicación (`GET /config/auctions`)
+los calcula y los manda el back. El frontend los muestra y solo usa la hora del servidor
+para animar el contador. Para eso el negocio toma la hora de `IReloj`, una abstracción
+inyectable, y no de `DateTime.UtcNow` en cada servicio.
+
 ## API
 
 Base: `/api/v1`. Los endpoints de publicar, pujar, billetera y `/users/me` requieren el
@@ -134,13 +206,14 @@ token JWT en el encabezado `Authorization: Bearer <token>`.
 | GET | `/auctions` | Catálogo con filtros y paginación |
 | GET | `/auctions/{id}` | Detalle de una subasta |
 | POST | `/auctions` | Publicar una subasta |
+| GET | `/config/auctions` | Límites de publicación (duración máxima y tolerancia de inicio) |
 | GET / POST | `/auctions/{id}/bids` | Listar pujas / ofertar |
 | GET | `/wallets/me` | Saldo total, retenido y disponible |
 | POST | `/wallets/me/deposits` | Depositar saldo |
 | GET | `/wallets/me/entries` | Historial de movimientos |
 
 El hub de SignalR está en `/hubs/subastas`. La documentación completa con los códigos de
-respuesta (201, 401, 403, 404, 409, 422) está en Swagger.
+respuesta (201, 400, 401, 403, 404, 409, 422) está en Swagger.
 
 ## Estructura del repositorio
 
@@ -151,8 +224,13 @@ SubastaYa/
 │   ├── SubastaYa.Application/     Casos de uso, DTOs y consultas
 │   ├── SubastaYa.Infrastructure/  EF Core, repositorios, migraciones y seed
 │   └── SubastaYa.Api/             Controllers, SignalR, worker y arranque
+├── tests/                         Pruebas de dominio (xUnit)
 ├── frontend/                      HTML, CSS y JavaScript
-├── scripts/                       Prueba de concurrencia
+├── scripts/                       verificar.ps1 y prueba-concurrencia.ps1
+├── .github/workflows/ci.yml       Compila y corre los tests en cada push
+├── CAMBIOS-REFACTOR.md            Qué cambió respecto del repositorio original
+├── PRUEBAS-MANUALES.md            Guion de pruebas de interfaz en el navegador
+├── .env.example                   Plantilla de contraseñas (el .env real no se versiona)
 └── docker-compose.yml             PostgreSQL y pgAdmin
 ```
 
@@ -228,12 +306,14 @@ proyecto. El repositorio es público, y quien tenga la clave de firma puede gene
 token válido para cualquier usuario.
 
 ```bash
-dotnet user-secrets set "ConnectionStrings:Default" "Host=localhost;Port=5432;Database=subastaya;Username=subastaya;Password=<POSTGRES_PASSWORD del .env>" -p src/SubastaYa.Api
+dotnet user-secrets set "ConnectionStrings:Default" "Host=127.0.0.1;Port=5432;Database=subastaya;Username=subastaya;Password=<POSTGRES_PASSWORD del .env>" -p src/SubastaYa.Api
 
 dotnet user-secrets set "Jwt:Clave" "<un texto propio de 32 caracteres o más>" -p src/SubastaYa.Api
 ```
 
-En la cadena va la misma contraseña que en `POSTGRES_PASSWORD` del `.env`. La clave
+En la cadena va la misma contraseña que en `POSTGRES_PASSWORD` del `.env`. El host es
+`127.0.0.1` a propósito: en algunas máquinas `localhost` se resuelve a IPv6 y la conexión
+expira, porque Docker publica el puerto solo en IPv4. La clave
 puede ser cualquier texto, pero **de 32 caracteres o más**: el algoritmo de firma
 necesita una clave de ese tamaño, y con una más corta la aplicación arranca igual pero
 falla al iniciar sesión, cuando tiene que firmar el token.
@@ -301,6 +381,21 @@ dotnet ef database update -p src/SubastaYa.Infrastructure -s src/SubastaYa.Api
 Al arrancar la aplicación se vuelven a cargar los datos de prueba. Conviene hacerlo antes
 de una demostración: algunas subastas del sembrado nacen vencidas a propósito y el
 proceso en segundo plano las cierra en cuanto arranca.
+
+## Pruebas y verificación
+
+| Qué | Cómo | Qué comprueba |
+|---|---|---|
+| Tests de dominio | `dotnet test` | Reglas de `Subasta` y `Billetera` sin base de datos: monto mínimo, anti-sniping, versiones, saldos |
+| Verificación de punta a punta | `powershell -ExecutionPolicy Bypass -File scripts/verificar.ps1` | Con la API y la base arriba: códigos HTTP, reglas rechazadas con 422, ofertas, saldos y que el frontend no tenga lógica propia |
+| Integración continua | GitHub Actions (`ci.yml`) | `dotnet build` y `dotnet test` en cada push y pull request |
+
+`verificar.ps1` crea su propio usuario y su propia subasta, así que no depende del sembrado.
+Cada corrida deja una subasta de prueba más; para volver al estado inicial, ver *Empezar de
+nuevo*. Con `-Completo` también compila, corre los tests y levanta la API sola.
+
+Lo que los scripts no pueden ver (colores del reloj, avisos, tiempo real entre dos navegadores,
+cierre por el worker) está en `PRUEBAS-MANUALES.md`.
 
 ## Prueba de concurrencia
 
