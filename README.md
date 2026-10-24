@@ -393,7 +393,7 @@ proceso en segundo plano las cierra en cuanto arranca.
 | Verificación de punta a punta | `powershell -ExecutionPolicy Bypass -File scripts/verificar.ps1` | Con la API y la base arriba: códigos HTTP, reglas rechazadas con 422, ofertas, saldos y el contrato de la API |
 | Integración continua | GitHub Actions (`ci.yml`) | `dotnet build` y `dotnet test` en cada push y pull request |
 
-`verificar.ps1` crea su propio usuario y su propia subasta, así que no depende del sembrado.
+`verificar.ps1` crea su propio usuario y su propia subasta; del sembrado solo usa las categorías.
 Cada corrida deja una subasta de prueba más; para volver al estado inicial, ver *Empezar de
 nuevo*. Con `-Completo` también compila, corre los tests y levanta la API sola.
 

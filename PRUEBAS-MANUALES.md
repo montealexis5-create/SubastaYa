@@ -23,6 +23,6 @@ Para empezar de cero: `dotnet ef database drop -f`, `dotnet ef database update` 
 
 ## Otras pantallas
 - [ ] Publicar con fechas incoherentes (fin antes de inicio, incremento mayor al precio): el aviso sale junto al campo. Si el back rechaza con 422, tambien sale junto al campo.
-- [ ] En los primeros 10 s despues de vencer (con el Album), el catalogo y el detalle muestran "Finalizando…" y el detalle no ofrece el formulario.
+- [ ] Cuando vence la Campera de cuero (a los 90 s del seed) y hasta que el worker la cierra, el catalogo y el detalle muestran "Finalizando…" y el detalle no ofrece el formulario.
 - [ ] Depositar en la billetera; revisar el historial de movimientos y la paginacion.
 - [ ] Mis Actividades: mis pujas y mis subastas.
